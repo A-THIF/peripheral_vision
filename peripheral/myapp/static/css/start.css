@@ -106,6 +106,22 @@ body {
   position: relative;
 }
 
+#page4 {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+#mobileWarning {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
 /* Settings Group */
 .settings-group {
   display: flex;
@@ -125,7 +141,8 @@ body {
   margin-bottom: 10px;
 }
 
-.settings-group input {
+.settings-group input,
+.settings-group select {
   padding: 5px;
   font-size: 16px;
   border: 1px solid #333;
@@ -167,6 +184,15 @@ body {
   color: #fff;
 }
 
+/* Text Alignment and Margin */
+.text-center {
+  text-align: center;
+}
+
+.mt-3 {
+  margin-top: 15px;
+}
+
 /* Responsive Adjustments */
 @media (max-width: 600px) {
   .btn, .choice {
@@ -179,7 +205,8 @@ body {
   .back-btn {
       top: 10px;
   }
-  .settings-group input {
+  .settings-group input,
+  .settings-group select {
       width: 80px;
   }
   .default-note {

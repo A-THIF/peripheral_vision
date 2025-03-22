@@ -7,7 +7,7 @@ def start_page(request):
     return render(request, 'start.html')
 
 def test_page(request):
-    return render(request, 'test.html')
+    return render(request, 'training.html')
 
 def report_page(request):
     # Fetch the latest result for simplicity (improve with user sessions later)

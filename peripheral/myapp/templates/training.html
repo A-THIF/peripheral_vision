@@ -1,0 +1,72 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peripheral Vision Training - Training Mode</title>
+    <link rel="stylesheet" href="{% static 'css/training.css' %}">
+</head>
+<body>
+    <!-- Training Page -->
+    <div id="trainingPage" class="container">
+        <div class="header">Training Mode</div>
+        <div class="timer">Time Remaining: <span id="timeRemaining">120</span>s</div>
+        <div class="score">Score: <span id="score">0</span>/<span id="totalAttempts">0</span></div>
+        <div class="light-container">
+            <!-- Central Light -->
+            <div id="centralLight" class="light central"></div>
+            <!-- Corner Lights -->
+            <div id="topLeftLight" class="light corner top-left" onclick="selectLight('topLeft')"></div>
+            <div id="topRightLight" class="light corner top-right" onclick="selectLight('topRight')"></div>
+            <div id="bottomLeftLight" class="light corner bottom-left" onclick="selectLight('bottomLeft')"></div>
+            <div id="bottomRightLight" class="light corner bottom-right" onclick="selectLight('bottomRight')"></div>
+        </div>
+        <div class="button-group">
+            <button class="btn" onclick="pauseSession()">Pause</button>
+            <button class="btn" onclick="showEndModal()">End</button>
+        </div>
+    </div>
+
+    <!-- Pause Modal -->
+    <div id="pauseModal" class="modal">
+        <div class="modal-content">
+            <div class="header">Paused</div>
+            <p>Session is paused. Resume to continue training.</p>
+            <div class="button-group">
+                <button class="btn choice" onclick="resumeSession()">Resume</button>
+                <button class="btn choice" onclick="showEndModal()">End</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- End Modal -->
+    <div id="endModal" class="modal">
+        <div class="modal-content">
+            <div class="header">End Session</div>
+            <p>Are you sure you want to end the session?</p>
+            <div class="button-group">
+                <button class="btn choice" onclick="endSession()">Yes</button>
+                <button class="btn choice" onclick="resumeSession()">No</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Page -->
+    <div id="reportPage" class="container" style="display: none;">
+        <div class="header">Training Report</div>
+        <div class="settings-group">
+            <p><strong>Correct Selections:</strong> <span id="reportCorrect">0</span></p>
+            <p><strong>Total Attempts:</strong> <span id="reportTotal">0</span></p>
+            <p><strong>Accuracy:</strong> <span id="reportAccuracy">0</span>%</p>
+        </div>
+        <div class="button-group">
+            <button class="btn choice" onclick="restartSession()">Restart</button>
+            <button class="btn choice" onclick="returnToStart()">Back to Start</button>
+        </div>
+    </div>
+
+    <script src="{% static 'js/training.js' %}"></script>
+</body>
+</html>
