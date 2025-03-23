@@ -1,11 +1,20 @@
+// Initial variables
 let speed = 800;
 let timeLimit = 60;
 let currentMode = "testing";
 let selectionTimeout = 1200;
 let centralToSelectionGap = 500;
 let selectionToCentralGap = 1000;
-let requiredDistance = 0; // To store the required viewing distance for 20 degrees
+let requiredDistance = 0;
 
+// Webcam variables
+let video, canvas, ctx, model, stream;
+let isTracking = false;
+let stableTime = 0;
+const REAL_FACE_WIDTH = 14; // Average face width in cm
+const FOCAL_LENGTH = 600; // Adjust if distance is off
+
+// Page navigation functions
 function showPage1() {
     document.getElementById("page1").style.display = "flex";
     document.getElementById("page2").style.display = "none";
@@ -94,74 +103,6 @@ function enterFullscreen() {
     showPage2();
 }
 
-async function startFaceTracking() {
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("canvas");
-    const currentDistanceDisplay = document.getElementById("currentDistance");
-    const distanceAdjustmentDisplay = document.getElementById("distanceAdjustment");
-
-    // Request webcam access
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    video.srcObject = stream;
-
-    // Load the face landmarks detection model
-    const model = await faceLandmarksDetection.load(
-        faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
-    );
-
-    // Calculate focal length (assume 70-degree FOV, 1280px width)
-    const fov = 70 * (Math.PI / 180); // 70 degrees in radians
-    const focalLength = 1280 / (2 * Math.tan(fov / 2)); // Focal length in pixels
-
-    // Detect faces and calculate distance
-    async function detectFace() {
-        const predictions = await model.estimateFaces({ input: video });
-        if (predictions.length > 0) {
-            const landmarks = predictions[0].scaledMesh;
-            // Get the left and right eye positions (indices 33 and 263 are approximate for outer eye corners)
-            const leftEye = landmarks[33]; // [x, y, z]
-            const rightEye = landmarks[263];
-            const apparentIPD = Math.sqrt(
-                Math.pow(rightEye[0] - leftEye[0], 2) +
-                Math.pow(rightEye[1] - leftEye[1], 2)
-            ); // In pixels
-
-            // Calculate distance (assume actual IPD = 6.3 cm)
-            const actualIPD = 6.3; // cm
-            const distance = (actualIPD * focalLength) / apparentIPD; // cm
-
-            // Display current distance
-            const roundedDistance = Math.round(distance);
-            currentDistanceDisplay.textContent = `${roundedDistance} cm`;
-
-            // Provide adjustment feedback
-            if (requiredDistance > 0) {
-                const difference = roundedDistance - requiredDistance;
-                if (Math.abs(difference) < 5) {
-                    distanceAdjustmentDisplay.textContent = "Distance is optimal!";
-                } else if (difference > 0) {
-                    distanceAdjustmentDisplay.textContent = `Move closer by ${Math.round(difference)} cm.`;
-                } else {
-                    distanceAdjustmentDisplay.textContent = `Move farther by ${Math.round(-difference)} cm.`;
-                }
-            }
-        } else {
-            currentDistanceDisplay.textContent = "No face detected.";
-            distanceAdjustmentDisplay.textContent = "Please position your face in front of the camera.";
-        }
-
-        // Repeat detection
-        requestAnimationFrame(detectFace);
-    }
-
-    // Start video and detection
-    video.addEventListener("play", () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        detectFace();
-    });
-}
-
 function calculateViewingDistance() {
     const deviceType = document.getElementById("deviceType").value;
     const screenSize = parseFloat(document.getElementById("screenSize").value);
@@ -172,43 +113,171 @@ function calculateViewingDistance() {
         return;
     }
 
-    // Get viewport size (assumes fullscreen mode)
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-
-    // Calculate PPI using resolution and screen size
     const diagonalPixels = Math.sqrt(viewportWidth * viewportWidth + viewportHeight * viewportHeight);
     const ppi = diagonalPixels / screenSize;
     const pixelsPerCm = ppi / 2.54;
-
-    // Calculate diagonal distance from center to corner light (40vw and 40vh)
-    const horizontalPixels = 0.4 * viewportWidth; // 40vw
-    const verticalPixels = 0.4 * viewportHeight; // 40vh
+    const horizontalPixels = 0.4 * viewportWidth;
+    const verticalPixels = 0.4 * viewportHeight;
     const diagonalPixelsToCorner = Math.sqrt(horizontalPixels * horizontalPixels + verticalPixels * verticalPixels);
-
-    // Convert to physical distance
     const diagonalCm = diagonalPixelsToCorner / pixelsPerCm;
-
-    // Calculate viewing distance for 20 degrees
-    const targetAngle = 20 * (Math.PI / 180); // 20 degrees in radians
+    const targetAngle = 20 * (Math.PI / 180);
     const viewingDistanceCm = diagonalCm / Math.tan(targetAngle);
     const viewingDistanceInches = viewingDistanceCm / 2.54;
-
-    // Round to nearest cm and inch
     const roundedCm = Math.round(viewingDistanceCm);
     const roundedInches = Math.round(viewingDistanceInches);
 
-    // Store the required distance for on-spot comparison
     requiredDistance = roundedCm;
-
     viewingDistanceDisplay.textContent = `Position your eyes approximately ${roundedCm} cm (${roundedInches} inches) from the screen for optimal peripheral vision training.`;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    showPage1();
-    document.getElementById("deviceType").addEventListener("change", calculateViewingDistance);
-    document.getElementById("screenSize").addEventListener("input", calculateViewingDistance);
-});
+async function startFaceTracking() {
+    if (isTracking) return;
+    isTracking = true;
+
+    video = document.getElementById("video");
+    canvas = document.getElementById("canvas");
+    ctx = canvas.getContext('2d');
+
+    video.style.display = 'block';
+    canvas.style.display = 'block';
+
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        console.log('Webcam initialized successfully');
+    } catch (err) {
+        console.error('Webcam error:', err);
+        alert('Webcam access failed. Please allow permissions.');
+        isTracking = false;
+        video.style.display = 'none';
+        canvas.style.display = 'none';
+        return;
+    }
+
+    try {
+        const detectorConfig = {
+            runtime: 'tfjs',
+            modelType: 'short'
+        };
+        model = await faceDetection.createDetector(faceDetection.SupportedModels.MediaPipeFaceDetector, detectorConfig);
+        console.log('Face detection model loaded successfully');
+    } catch (err) {
+        console.error('Face detection load error:', err);
+        alert('Failed to load face detection model. Check your connection and refresh.');
+        stopFaceTracking();
+        return;
+    }
+
+    video.width = window.innerWidth;
+    video.height = window.innerHeight;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    video.onplay = () => {
+        console.log('Video started playing, initiating detection');
+        detectFace();
+    };
+
+    video.play().then(() => {
+        console.log('Video play triggered');
+    }).catch(err => {
+        console.error('Video play error:', err);
+    });
+
+    setTimeout(() => {
+        if (!isTracking) return;
+        console.log('Fallback: Starting detection manually');
+        detectFace();
+    }, 2000);
+}
+
+async function detectFace() {
+    if (!isTracking || !model) {
+        console.log('Detection stopped: Tracking off or model not loaded');
+        return;
+    }
+
+    // Clear canvas and draw video frame
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    try {
+        const faces = await model.estimateFaces(video);
+        console.log('Faces detected:', faces);
+
+        if (faces.length > 0) {
+            const face = faces[0];
+            const { box } = face;
+            const faceWidthPixels = box.width;
+
+            const distance = (FOCAL_LENGTH * REAL_FACE_WIDTH) / faceWidthPixels;
+            const roundedDistance = Math.round(distance);
+
+            // Draw green bounding box
+            ctx.beginPath();
+            ctx.rect(box.xMin, box.yMin, box.width, box.height);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'green';
+            ctx.stroke();
+
+            // Draw distance text above the face
+            ctx.font = '20px Montserrat';
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            const text = `${roundedDistance} cm`;
+            const textX = box.xMin + box.width / 2;
+            const textY = box.yMin - 10; // 10px above the box
+            ctx.fillText(text, textX, textY);
+            console.log('Drawing text:', text, 'at', textX, textY);
+
+            // Update HTML elements
+            document.getElementById("currentDistance").textContent = `${roundedDistance} cm`;
+
+            const tolerance = 5;
+            const difference = roundedDistance - requiredDistance;
+            if (Math.abs(difference) < tolerance) {
+                document.getElementById("distanceAdjustment").textContent = "Distance is optimal!";
+                stableTime += 1000 / 30; // Increment by frame time (assuming ~30 FPS)
+                console.log('Stable time:', stableTime);
+                if (stableTime >= 5000) { // 5 seconds
+                    stopFaceTracking();
+                    return;
+                }
+            } else {
+                stableTime = 0; // Reset if out of tolerance
+                if (difference > 0) {
+                    document.getElementById("distanceAdjustment").textContent = `Move closer by ${Math.round(difference)} cm.`;
+                } else {
+                    document.getElementById("distanceAdjustment").textContent = `Move farther by ${Math.round(-difference)} cm.`;
+                }
+            }
+            console.log(`Face detected: Distance = ${roundedDistance} cm`);
+        } else {
+            document.getElementById("currentDistance").textContent = "No face detected.";
+            document.getElementById("distanceAdjustment").textContent = "Center your face in the frame.";
+            stableTime = 0;
+            console.log('No face detected in this frame');
+        }
+    } catch (err) {
+        console.error('Detection error:', err);
+    }
+
+    requestAnimationFrame(detectFace);
+}
+
+function stopFaceTracking() {
+    isTracking = false;
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+    video.style.display = 'none';
+    canvas.style.display = 'none';
+    document.getElementById("currentDistance").textContent = `${Math.round(requiredDistance)} cm (Locked)`;
+    document.getElementById("distanceAdjustment").textContent = "Distance set!";
+    console.log('Tracking stopped');
+}
 
 function startSession() {
     const speedInput = document.getElementById("speed").value;
@@ -226,6 +295,12 @@ function startSession() {
     }
 
     alert(`Starting ${currentMode} with Speed: ${speedDisplay}, Duration: ${timeLimit}s, Selection Timeout: ${selectionTimeout}ms, Gaps: ${centralToSelectionGap}ms/${selectionToCentralGap}ms`);
-    // Update the URL to match the pattern in urls.py
-    window.location.href = `/training/?mode=${currentMode}&speed=${speed}&time_limit=${timeLimit}&selection_timeout=${selectionTimeout}&central_to_selection_gap=${centralToSelectionGap}&selection_to_central_gap=${selectionToCentralGap}`;
+    window.location.href = `/training/?mode=${currentMode}&speed=${speed}&time_limit=${timeLimit}&selection_timeout=${selectionTimeout}¢ral_to_selection_gap=${centralToSelectionGap}&selection_to_central_gap=${selectionToCentralGap}`;
 }
+
+// Initial setup
+document.addEventListener('DOMContentLoaded', () => {
+    showPage1();
+    document.getElementById("deviceType").addEventListener("change", calculateViewingDistance);
+    document.getElementById("screenSize").addEventListener("input", calculateViewingDistance);
+});
