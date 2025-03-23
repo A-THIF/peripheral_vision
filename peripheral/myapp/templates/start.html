@@ -7,6 +7,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Peripheral Vision Training</title>
         <link rel="stylesheet" href="{% static 'css/start.css' %}">
+        <link rel="stylesheet" href="{% static 'css/webcam.css' %}">
         <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection@1.0.1/dist/face-detection.min.js"></script>
     </head>
@@ -19,7 +20,7 @@
     </div>
 
     <!-- Page 2: Mode Selection -->
-    <div id="page2" class="container">
+    <div id="page2" class="container" style="display: none;">
         <button class="back-btn" onclick="showPage1()">Back</button>
         <div class="header">Peripheral Vision Training</div>
         <div class="button-group">
@@ -29,7 +30,7 @@
     </div>
 
     <!-- Page 3: Settings -->
-    <div id="page3" class="container">
+    <div id="page3" class="container" style="display: none;">
         <button class="back-btn" onclick="showPage2()">Back</button>
         <div class="header">Peripheral Vision Training</div>
         <div class="settings-group">
@@ -58,7 +59,7 @@
     </div>
 
     <!-- Page 4: Dynamic Distance Calculation -->
-    <div id="page4" class="container">
+    <div id="page4" class="container" style="display: none;">
         <button class="back-btn" onclick="showPage3(currentMode)">Back</button>
         <div class="header">Peripheral Vision Training</div>
         <div class="settings-group">
@@ -75,9 +76,9 @@
             <p class="text-center mt-3"><strong>Current Distance (On-Spot):</strong> <span id="currentDistance">Enable webcam to measure.</span></p>
             <p class="text-center mt-3"><strong>Adjustment Needed:</strong> <span id="distanceAdjustment">Enable webcam to measure.</span></p>
             <p class="text-center">To estimate this distance, extend your arm towards the screen; adjust so your fingertips are at the recommended distance from the display. Ensure you are in fullscreen mode for the best experience.</p>
-            <video id="video" width="320" height="240" autoplay style="display: none;"></video>
-            <canvas id="canvas" style="display: none;"></canvas>
         </div>
+        <video id="video" autoplay playsinline style="display: none;"></video>
+        <canvas id="canvas" style="display: none;"></canvas>
         <div class="button-group">
             <button class="btn choice" onclick="startFaceTracking()">Enable Webcam for On-Spot Distance</button>
             <button class="btn choice" onclick="startSession()">Start</button>
@@ -91,5 +92,6 @@
     </div>
 
     <script src="{% static 'js/start.js' %}"></script>
+    <script src="{% static 'js/webcam.js' %}"></script>
 </body>
 </html>
