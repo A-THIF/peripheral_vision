@@ -7,11 +7,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Peripheral Vision Training</title>
     <link rel="stylesheet" href="{% static 'css/start.css' %}">
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@0.0.3/dist/face-landmarks-detection.js"></script>
 </head>
 <body>
-    <!-- Page 1: Start Button -->
+    <!-- Page 1: Start Page -->
     <div id="page1" class="container">
         <div class="header">Peripheral Vision Training</div>
         <button class="btn choice" onclick="enterFullscreen()">Start Training in Fullscreen</button>
@@ -19,70 +17,86 @@
     </div>
 
     <!-- Page 2: Mode Selection -->
-    <div id="page2" class="container">
+    <div id="page2" class="container" style="display: none;">
         <button class="back-btn" onclick="showPage1()">Back</button>
         <div class="header">Peripheral Vision Training</div>
         <div class="button-group">
             <button class="btn choice" onclick="showPage3('testing')">Testing</button>
-            <button class="btn choice" onclick="showPage3('training')">Training</button>
+            <button class="btn choice" onclick="showPage4('training')">Training</button>
         </div>
     </div>
 
-    <!-- Page 3: Settings -->
-    <div id="page3" class="container">
+    <!-- Page 3: Testing Mode Settings -->
+    <div id="page3" class="container" style="display: none;">
         <button class="back-btn" onclick="showPage2()">Back</button>
         <div class="header">Peripheral Vision Training</div>
         <div class="settings-group">
-            <span id="mode-display"></span>
-            <div id="speed-section">
-                <label id="speed-label">Blip Speed (Hz):</label>
-                <input type="number" id="speed" min="0.5" max="2" step="0.1">
-                <p class="default-note" id="speed-note">Recommended: 0.5-2 Hz</p>
+            <span id="mode-display-testing">Mode: Testing</span>
+            <div id="speed-section-testing">
+                <label id="speed-label-testing">Blip Speed (Hz):</label>
+                <input type="number" id="speed-testing" min="0.5" max="2" step="0.1" value="1">
+                <p class="default-note" id="speed-note-testing">Recommended: 0.5-2 Hz</p>
             </div>
-            <label id="time-limit-label">Duration (seconds):</label>
-            <input type="number" id="timeLimit" min="30" max="300" step="10">
-            <p class="default-note" id="time-limit-note">Recommended: 30-300 seconds</p>
+            <label id="time-limit-label-testing">Duration of the Testing (seconds):</label>
+            <input type="number" id="timeLimit-testing" min="30" max="180" step="10" value="60">
+            <p class="default-note" id="time-limit-note-testing">Recommended: 30-180 seconds</p>
             <label>Selection Time (ms):</label>
-            <input type="number" id="selectionTimeout" min="1000" max="2000" step="100" value="1200">
+            <input type="number" id="selectionTimeout-testing" min="1000" max="2000" step="100" value="1200">
             <p class="default-note">Recommended: 1000-2000 ms (Football: Start at 1200 ms, reduce to 1000 ms for speed)</p>
-            <label>Gap After Central Light (ms):</label>
-            <input type="number" id="centralToSelectionGap" min="300" max="1000" step="100" value="500">
-            <p class="default-note">Recommended: 300-1000 ms (Football: Start at 500 ms, reduce to 300 ms for speed)</p>
-            <label>Gap After Selection (ms):</label>
-            <input type="number" id="selectionToCentralGap" min="500" max="1500" step="100" value="1000">
-            <p class="default-note">Recommended: 500-1500 ms (Football: Start at 1000 ms, reduce to 500 ms for speed)</p>
         </div>
         <div class="button-group">
-            <button class="btn choice" onclick="showPage4()">Next: Calculate Viewing Distance</button>
+            <button class="btn choice" onclick="showPage5()">Next: Calculate Viewing Distance</button>
         </div>
     </div>
 
-    <!-- Page 4: Dynamic Distance Calculation -->
-    <div id="page4" class="container">
-        <button class="back-btn" onclick="showPage3(currentMode)">Back</button>
+    <!-- Page 4: Training Mode Settings -->
+    <div id="page4" class="container" style="display: none;">
+        <button class="back-btn" onclick="showPage2()">Back</button>
         <div class="header">Peripheral Vision Training</div>
         <div class="settings-group">
-            <label>Device Type:</label>
-            <select id="deviceType">
-                <option value="desktop">Desktop</option>
-                <option value="laptop">Laptop</option>
-            </select>
-            <p class="default-note">Select your device type to calculate the optimal viewing distance.</p>
-            <label>Screen Size (Diagonal in Inches):</label>
-            <input type="number" id="screenSize" min="10" max="50" step="1" value="27">
-            <p class="default-note">Enter your screen's diagonal size (e.g., 27 for a 27-inch monitor, 15 for a 15-inch laptop).</p>
-            <p class="text-center mt-3"><strong>Recommended Viewing Distance (Static):</strong> <span id="viewingDistance">Please enter your screen size to calculate.</span></p>
-            <p class="text-center mt-3"><strong>Current Distance (On-Spot):</strong> <span id="currentDistance">Enable webcam to measure.</span></p>
-            <p class="text-center mt-3"><strong>Adjustment Needed:</strong> <span id="distanceAdjustment">Enable webcam to measure.</span></p>
-            <p class="text-center">To estimate this distance, extend your arm towards the screen; adjust so your fingertips are at the recommended distance from the display. Ensure you are in fullscreen mode for the best experience.</p>
-            <video id="video" width="320" height="240" autoplay style="display: none;"></video>
-            <canvas id="canvas" style="display: none;"></canvas>
+            <span id="mode-display-training">Mode: Training</span>
+            <div id="speed-section-training">
+                <label id="speed-label-training">Gap After Central Light (ms):</label>
+                <input type="number" id="speed-training" min="300" max="1000" step="100" value="500">
+                <p class="default-note" id="speed-note-training">Recommended: 300-1000 ms (Football: Start at 500 ms, reduce to 300 ms for speed)</p>
+            </div>
+            <label id="time-limit-label-training">Duration of the Training (seconds):</label>
+            <input type="number" id="timeLimit-training" min="60" max="300" step="10" value="120">
+            <p class="default-note" id="time-limit-note-training">Recommended: 60-300 seconds</p>
+            <label>Selection Time (ms):</label>
+            <input type="number" id="selectionTimeout-training" min="1000" max="2000" step="100" value="1200">
+            <p class="default-note">Recommended: 1000-2000 ms (Football: Start at 1200 ms, reduce to 1000 ms for speed)</p>
+            <label>Gap After Selection (ms):</label>
+            <input type="number" id="selectionToCentralGap-training" min="500" max="1500" step="100" value="1000">
+            <p class="default-note">Recommended: 500-1500 ms (Football: Start at 1000 ms, reduce to 500 ms for speed)</p>
         </div>
         <div class="button-group">
-            <button class="btn choice" onclick="startFaceTracking()">Enable Webcam for On-Spot Distance</button>
-            <button class="btn choice" onclick="startSession()">Start</button>
+            <button class="btn choice" onclick="showPage5()">Next: Calculate Viewing Distance</button>
         </div>
     </div>
+
+    <!-- Page 5: Distance Detection -->
+<div id="page5" class="container" style="display: none;">
+    <button class="back-btn" onclick="showPreviousPage()">Back</button>
+    <div class="header">Peripheral Vision Training</div>
+    <div class="settings-group">
+        <label>Device Type:</label>
+        <select id="deviceType">
+            <option value="desktop">Desktop</option>
+            <option value="laptop">Laptop</option>
+        </select>
+        <p class="default-note">Select your device type to calculate the optimal viewing distance.</p>
+        <label>Screen Size (Diagonal in Inches):</label>
+        <input type="number" id="screenSize" min="10" max="50" step="1" value="27">
+        <p class="default-note">Enter your screen's diagonal size (e.g., 27 for a 27-inch monitor, 15 for a 15-inch laptop).</p>
+        <p class="text-center mt-3"><strong>Recommended Viewing Distance:</strong> <span id="viewingDistance">Please enter your screen size to calculate.</span></p>
+        <p class="text-center">To estimate this distance, extend your arm towards the screen; adjust so your fingertips are at the recommended distance from the display. Ensure you are in fullscreen mode for the best experience.</p>
+    </div>
+    <div class="button-group">
+        <button class="btn choice" onclick="window.open('/onspot-distance-detection/', '_blank')">On-Spot Distance Detection</button>
+        <button class="btn choice" onclick="startSession()">Start</button>
+    </div>
+</div>
 
     <!-- Mobile Warning -->
     <div id="mobileWarning" class="container" style="display: none;">

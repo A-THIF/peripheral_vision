@@ -13,6 +13,7 @@ def report_page(request):
     # Fetch the latest result for simplicity (improve with user sessions later)
     latest_result = VisionTestResult.objects.last()
     return render(request, 'report.html', {'result': latest_result})
+    
 
 def save_result(request):
     if request.method == 'POST':
@@ -26,3 +27,6 @@ def save_result(request):
         result.save()
         return JsonResponse({'status': 'success', 'id': result.id})
     return JsonResponse({'status': 'error'})
+
+def onspot_distance_detection(request):
+    return render(request, 'onspot_distance_detection.html')
