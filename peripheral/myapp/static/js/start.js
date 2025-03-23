@@ -5,6 +5,45 @@ let selectionTimeout = 1200;
 let centralToSelectionGap = 500;
 let selectionToCentralGap = 1000;
 
+// Global function to calculate and update viewing distance
+function updateViewingDistance() {
+    const deviceTypeInput = document.getElementById("deviceType");
+    const screenSizeInput = document.getElementById("screenSize");
+    const viewingDistance = document.getElementById("viewingDistance");
+
+    // Debugging: Check if DOM elements are found
+    if (!deviceTypeInput || !screenSizeInput || !viewingDistance) {
+        console.error("DOM elements not found in updateViewingDistance:", {
+            deviceTypeInput: !!deviceTypeInput,
+            screenSizeInput: !!screenSizeInput,
+            viewingDistance: !!viewingDistance
+        });
+        return;
+    }
+
+    const deviceType = deviceTypeInput.value;
+    const screenSize = parseFloat(screenSizeInput.value);
+
+    // Debugging: Log input values
+    console.log("updateViewingDistance called:", { deviceType, screenSize });
+
+    if (isNaN(screenSize) || screenSize <= 0) {
+        viewingDistance.textContent = "Please enter a valid positive screen size.";
+        return;
+    }
+
+    // Ergonomic base distances and reference screen sizes
+    const baseDistance = deviceType === "desktop" ? 60 : 50; // cm (midpoint of 50-70 for desktop, 40-60 for laptop)
+    const referenceSize = deviceType === "desktop" ? 24 : 15; // inches (24 for desktop, 15 for laptop)
+
+    // Proportional scaling (no constraints)
+    const adjustedDistance = (baseDistance / referenceSize) * screenSize;
+    const finalDistance = Math.round(adjustedDistance * 10) / 10; // Round to 1 decimal place
+
+    viewingDistance.textContent = `${finalDistance} cm`;
+    console.log(`Screen Size: ${screenSize} inches, Viewing Distance: ${finalDistance} cm`);
+}
+
 function enterFullscreen() {
     const elem = document.documentElement;
     if (elem.requestFullscreen) {
@@ -58,6 +97,8 @@ function showPage4(mode) {
 }
 
 function showPage5() {
+    console.log("showPage5 called");
+
     document.getElementById("page1").style.display = "none";
     document.getElementById("page2").style.display = "none";
     document.getElementById("page3").style.display = "none";
@@ -65,20 +106,37 @@ function showPage5() {
     document.getElementById("page5").style.display = "flex";
     document.getElementById("mobileWarning").style.display = "none";
 
-    const deviceType = document.getElementById("deviceType").value;
-    const screenSize = parseFloat(document.getElementById("screenSize").value);
-    const viewingDistance = document.getElementById("viewingDistance");
+    const deviceTypeInput = document.getElementById("deviceType");
+    const screenSizeInput = document.getElementById("screenSize");
 
-    if (isNaN(screenSize) || screenSize <= 0) {
-        viewingDistance.textContent = "Please enter a valid screen size.";
+    // Debugging: Check if DOM elements are found
+    if (!deviceTypeInput || !screenSizeInput) {
+        console.error("DOM elements not found in showPage5:", {
+            deviceTypeInput: !!deviceTypeInput,
+            screenSizeInput: !!screenSizeInput
+        });
         return;
     }
 
-    const diagonalInches = screenSize;
-    const diagonalCm = diagonalInches * 2.54;
-    const cornerDistanceCm = (diagonalCm / 2) * Math.tan(20 * Math.PI / 180);
-    const viewingDistanceCm = cornerDistanceCm / Math.tan(10 * Math.PI / 180);
-    viewingDistance.textContent = `${Math.round(viewingDistanceCm)} cm`;
+    // Remove existing event listeners to prevent duplicates
+    deviceTypeInput.removeEventListener("change", updateViewingDistance);
+    screenSizeInput.removeEventListener("input", updateViewingDistance);
+
+    // Add event listeners
+    deviceTypeInput.addEventListener("change", () => {
+        console.log("Device type changed to:", deviceTypeInput.value);
+        updateViewingDistance();
+    });
+    screenSizeInput.addEventListener("input", () => {
+        console.log("Screen size changed to:", screenSizeInput.value);
+        updateViewingDistance();
+    });
+
+    // Debugging: Confirm event listeners are added
+    console.log("Event listeners added for deviceType and screenSize");
+
+    // Trigger on page load
+    updateViewingDistance();
 }
 
 function showPreviousPage() {
@@ -109,7 +167,7 @@ function startSession() {
     }
 
     alert(`Starting ${currentMode} with Speed: ${speedDisplay}, Duration: ${timeLimit}s, Selection Timeout: ${selectionTimeout}ms, Gaps: ${centralToSelectionGap}ms/${selectionToCentralGap}ms`);
-    window.location.href = `/training/?mode=${currentMode}&speed=${speed}&time_limit=${timeLimit}&selection_timeout=${selectionTimeout}&central_to_selection_gap=${centralToSelectionGap}&selection_to_central_gap=${selectionToCentralGap}`;
+    window.location.href = `/training/?mode=${currentMode}&speed=${speed}&time_limit=${timeLimit}&selection_timeout=${selectionTimeout}¢ral_to_selection_gap=${centralToSelectionGap}&selection_to_central_gap=${selectionToCentralGap}`;
 }
 
 // Check if the device is mobile
