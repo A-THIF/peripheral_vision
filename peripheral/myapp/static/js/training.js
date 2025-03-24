@@ -8,6 +8,7 @@ const centralToSelectionGap = parseInt(urlParams.get('central_to_selection_gap')
 const selectionToCentralGap = parseInt(urlParams.get('selection_to_central_gap')) || 1000; // Gap After Selection (ms)
 const screenSize = parseFloat(urlParams.get('screen_size')) || 19; // Screen size in inches (default to 19)
 const viewingDistance = parseFloat(urlParams.get('viewing_distance')) || 47.5; // Viewing distance in cm (default to 47.5)
+const deviceType = urlParams.get('device_type') || 'desktop'; // Device type (desktop or laptop, default to desktop)
 
 // Game state
 let timeRemaining = timeLimit;
@@ -50,11 +51,10 @@ const cornerLights = {
 // Update header based on mode
 header.textContent = mode === 'training' ? 'Training Mode' : 'Testing Mode';
 
-// Adjust light sizes and positions based on screen size and viewing distance
+// Adjust light sizes and positions based on screen size, viewing distance, and device type
 function adjustLights() {
-    // Estimate DPI based on device type (assumption: desktops have lower DPI than laptops)
-    const deviceType = urlParams.get('mode') === 'testing' ? 'laptop' : 'desktop'; // Simplified assumption
-    const dpi = deviceType === 'desktop' ? 96 : 120; // Typical DPI values
+    // Use device_type to set DPI (dots per inch)
+    const dpi = deviceType === 'desktop' ? 96 : 120; // Typical DPI values: 96 for desktops, 120 for laptops
     const pixelsPerCm = dpi / 2.54; // Convert DPI to pixels per cm
 
     // Calculate visual angle sizes
@@ -65,7 +65,7 @@ function adjustLights() {
     // Size in cm = 2 * viewingDistance * tan(angle/2)
     const centralSizeCm = 2 * viewingDistance * Math.tan((centralAngle / 2) * (Math.PI / 180));
     const cornerSizeCm = 2 * viewingDistance * Math.tan((cornerAngle / 2) * (Math.PI / 180));
-    const cornerDistanceCm = 2 * viewingDistance * Math.tan((cornerPositionAngle / 2) * (Math.PI / 180));
+    const cornerDistanceCm = viewingDistance * Math.tan(cornerPositionAngle * (Math.PI / 180)); // Distance from center to corner light
 
     // Convert sizes to pixels
     const centralSizePx = centralSizeCm * pixelsPerCm;
@@ -78,28 +78,33 @@ function adjustLights() {
         light.style.setProperty('--corner-size', `${cornerSizePx}px`);
     });
 
-    // Calculate corner positions (convert distance to vw/vh for responsiveness)
+    // Estimate the screen's physical dimensions in pixels
     const screenDiagonalCm = screenSize * 2.54; // Convert inches to cm
     const screenDiagonalPx = screenDiagonalCm * pixelsPerCm; // Approximate diagonal in pixels
-    const cornerDistanceVw = (cornerDistancePx / screenDiagonalPx) * 100; // Convert to vw/vh percentage
-    const cornerOffset = 5; // Small offset from the edge (in vw/vh)
 
-    Object.values(cornerLights).forEach(light => {
-        light.style.setProperty('--corner-top', `${cornerOffset}vh`);
-        light.style.setProperty('--corner-bottom', `${cornerOffset}vh`);
-        light.style.setProperty('--corner-left', `${cornerOffset}vw`);
-        light.style.setProperty('--corner-right', `${cornerOffset}vw`);
-    });
+    // Assume a typical aspect ratio (16:9) to estimate width and height
+    const aspectRatio = 16 / 9;
+    const screenWidthPx = screenDiagonalPx / Math.sqrt(1 + (1 / aspectRatio) ** 2);
+    const screenHeightPx = screenWidthPx / aspectRatio;
 
-    // Adjust positions based on the calculated distance
-    topLeftLight.style.setProperty('--corner-top', `${cornerOffset}vh`);
-    topLeftLight.style.setProperty('--corner-left', `${cornerOffset}vw`);
-    topRightLight.style.setProperty('--corner-top', `${cornerOffset}vh`);
-    topRightLight.style.setProperty('--corner-right', `${cornerOffset}vw`);
-    bottomLeftLight.style.setProperty('--corner-bottom', `${cornerOffset}vh`);
-    bottomLeftLight.style.setProperty('--corner-left', `${cornerOffset}vw`);
-    bottomRightLight.style.setProperty('--corner-bottom', `${cornerOffset}vh`);
-    bottomRightLight.style.setProperty('--corner-right', `${cornerOffset}vw`);
+    // Convert corner distance to vw and vh
+    const cornerDistanceVw = (cornerDistancePx / screenWidthPx) * 100; // Convert to vw percentage
+    const cornerDistanceVh = (cornerDistancePx / screenHeightPx) * 100; // Convert to vh percentage
+
+    // Calculate the offset from the center (50vw, 50vh) to place the corner lights at 30 degrees
+    // Since 30 degrees is roughly at a 45-degree angle in the 2D plane (for simplicity), adjust for top-left, top-right, etc.
+    const cornerOffsetVw = 50 - cornerDistanceVw; // Distance from the edge (left or right)
+    const cornerOffsetVh = 50 - cornerDistanceVh; // Distance from the edge (top or bottom)
+
+    // Apply positions to the corner lights
+    topLeftLight.style.setProperty('--corner-top', `${cornerOffsetVh}vh`);
+    topLeftLight.style.setProperty('--corner-left', `${cornerOffsetVw}vw`);
+    topRightLight.style.setProperty('--corner-top', `${cornerOffsetVh}vh`);
+    topRightLight.style.setProperty('--corner-right', `${cornerOffsetVw}vw`);
+    bottomLeftLight.style.setProperty('--corner-bottom', `${cornerOffsetVh}vh`);
+    bottomLeftLight.style.setProperty('--corner-left', `${cornerOffsetVw}vw`);
+    bottomRightLight.style.setProperty('--corner-bottom', `${cornerOffsetVh}vh`);
+    bottomRightLight.style.setProperty('--corner-right', `${cornerOffsetVw}vw`);
 }
 
 // Call adjustLights on page load

@@ -159,7 +159,6 @@ function startSession() {
     centralToSelectionGap = currentMode === "testing" ? 0 : speed;
     selectionToCentralGap = currentMode === "testing" ? 0 : parseInt(selectionToCentralGapInput) || 1000;
 
-<<<<<<< Updated upstream
     // Get screen size and viewing distance from page5
     const screenSizeInput = document.getElementById("screenSize");
     const viewingDistanceElement = document.getElementById("viewingDistance");
@@ -167,12 +166,14 @@ function startSession() {
     const viewingDistanceText = viewingDistanceElement.textContent; // e.g., "47.5 cm"
     const viewingDistance = parseFloat(viewingDistanceText.replace(" cm", ""));
 
-    // Redirect to the training page with additional parameters
-    window.location.href = `/training/?mode=${currentMode}&speed=${speed}&time_limit=${timeLimit}&selection_timeout=${selectionTimeout}&central_to_selection_gap=${centralToSelectionGap}&selection_to_central_gap=${selectionToCentralGap}&screen_size=${screenSize}&viewing_distance=${viewingDistance}`;
-=======
-    // Redirect to the training page without showing an alert
-    window.location.href = `/training/?mode=${currentMode}&speed=${speed}&time_limit=${timeLimit}&selection_timeout=${selectionTimeout}&central_to_selection_gap=${centralToSelectionGap}&selection_to_central_gap=${selectionToCentralGap}`;
->>>>>>> Stashed changes
+    // Validate screen size and viewing distance
+    if (isNaN(screenSize) || screenSize <= 0 || isNaN(viewingDistance) || viewingDistance <= 0) {
+        console.error("Invalid screen size or viewing distance:", { screenSize, viewingDistance });
+        return;
+    }
+
+    // Redirect to the training page with all parameters
+    window.location.href = `/training/?mode=${currentMode}&speed=${speed}&time_limit=${timeLimit}&selection_timeout=${selectionTimeout}&central_to_selection_gap=${centralToSelectionGap}&selection_to_central_gap=${selectionToCentralGap}&screen_size=${screenSize}&viewing_distance=${viewingDistance}&device_type=${document.getElementById("deviceType").value}`;
 }
 
 // Check if the device is mobile
