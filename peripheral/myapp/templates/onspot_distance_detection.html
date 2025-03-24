@@ -1,0 +1,31 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>On-Spot Distance Detection</title>
+    <link rel="stylesheet" href="{% static 'css/webcam.css' %}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">On-Spot Distance Detection</div>
+        <div class="settings-group">
+            <p class="text-center"><strong>Recommended Viewing Distance:</strong> <span id="requiredDistance">{{ required_distance }} cm</span></p>
+            <p class="text-center mt-3"><strong>Current Distance:</strong> <span id="currentDistance">Click "Start Webcam" to measure.</span></p>
+            <p class="text-center mt-3"><strong>Adjustment Needed:</strong> <span id="distanceAdjustment">Click "Start Webcam" to measure.</span></p>
+            <p class="text-center">To estimate this distance, ensure your face is centered in the webcam frame with good lighting.</p>
+        </div>
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas" style="display: none;"></canvas>
+        <div class="button-group" id="webcamButtonGroup">
+            <button class="btn choice" onclick="startDistanceTracking()">Start Webcam</button>
+            <button class="btn choice" onclick="window.close()">Close</button>
+        </div>
+        <button id="closeWebcamBtn" class="btn choice close-webcam" onclick="stopDistanceTracking()" style="display: none;">Stop Webcam</button>
+    </div>
+
+    <script src="{% static 'js/webcam.js' %}"></script>
+</body>
+</html>
