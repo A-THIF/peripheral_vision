@@ -11,17 +11,23 @@ function updateViewingDistance() {
     const deviceTypeInput = document.getElementById("deviceType");
     const screenSizeInput = document.getElementById("screenSize");
     const viewingDistance = document.getElementById("viewingDistance");
+    const resolutionWidthInput = document.getElementById("resolutionWidth");
+    const resolutionHeightInput = document.getElementById("resolutionHeight");
+    const hFovDisplay = document.getElementById("hFov");
 
-    if (!deviceTypeInput || !screenSizeInput || !viewingDistance) {
+    if (!deviceTypeInput || !screenSizeInput || !viewingDistance || 
+        !resolutionWidthInput || !resolutionHeightInput || !hFovDisplay) {
         console.error("Missing DOM elements in updateViewingDistance.");
         return;
     }
 
     const deviceType = deviceTypeInput.value;
     const screenSize = parseFloat(screenSizeInput.value);
+    const resolutionWidth = parseInt(resolutionWidthInput.value);
+    const resolutionHeight = parseInt(resolutionHeightInput.value);
 
-    if (isNaN(screenSize) || screenSize <= 0) {
-        viewingDistance.textContent = "Please enter a valid positive screen size.";
+    if (isNaN(screenSize) || screenSize <= 0 || isNaN(resolutionWidth) || isNaN(resolutionHeight)) {
+        viewingDistance.textContent = "Please enter valid positive values.";
         return;
     }
 
@@ -32,20 +38,44 @@ function updateViewingDistance() {
     // Proportional scaling for viewing distance
     const adjustedDistance = (baseDistance / referenceSize) * screenSize;
     const finalDistance = Math.round(adjustedDistance * 10) / 10;
-
     viewingDistance.textContent = `${finalDistance} cm`;
-    console.log(`Screen Size: ${screenSize} inches, Viewing Distance: ${finalDistance} cm`);
+
+    // Calculate H-FOV
+    const screenWidthInCm = (screenSize * 2.54) * (resolutionWidth / Math.sqrt(resolutionWidth ** 2 + resolutionHeight ** 2));
+    const viewingDistanceMeters = finalDistance / 100;
+    const screenWidthMeters = screenWidthInCm / 100;
+
+    const hFovRad = 2 * Math.atan((screenWidthMeters / 2) / viewingDistanceMeters);
+    const hFovDeg = (hFovRad * (180 / Math.PI)).toFixed(2);
+
+    // Update H-FOV Display
+    hFovDisplay.textContent = `${hFovDeg}°`;
+
+    console.log(`Screen Size: ${screenSize} inches, Viewing Distance: ${finalDistance} cm, H-FOV: ${hFovDeg}°`);
 }
 
-// Function to Enter Fullscreen Mode
-function enterFullscreen() {
+// Function to Enter Fullscreen and Continue
+function enterFullscreenAndContinue() {
     const elem = document.documentElement;
-    if (elem.requestFullscreen) elem.requestFullscreen();
-    else if (elem.mozRequestFullScreen) elem.mozRequestFullScreen();
-    else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-    else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+    
+    // Request fullscreen using the appropriate method
+    const enterFS = () => {
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+            elem.mozRequestFullScreen();
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+        }
+        
+        // Show the next page after entering fullscreen
+        showPage2();
+    };
 
-    showPage2(); // Proceed to next page after fullscreen
+    // Try to enter fullscreen and continue
+    enterFS();
 }
 
 // Page Navigation Functions
@@ -69,32 +99,63 @@ function showPreviousPage() {
 
 // Start Training or Testing Session
 function startSession() {
-    const speedInput = document.getElementById(`speed-${currentMode}`).value;
-    const timeLimitInput = document.getElementById(`timeLimit-${currentMode}`).value;
-    const selectionTimeoutInput = document.getElementById(`selectionTimeout-${currentMode}`).value;
-    const selectionToCentralGapInput = currentMode === "training"
-        ? document.getElementById("selectionToCentralGap-training").value
-        : 0;
+    // Get the current mode from the page visibility
+    const currentMode = document.getElementById('page3').style.display !== 'none' ? 'testing' : 'training';
 
-    speed = parseInt(speedInput) || (currentMode === "testing" ? 1 : 500);
-    timeLimit = parseInt(timeLimitInput) || (currentMode === "testing" ? 60 : 120);
-    selectionTimeout = parseInt(selectionTimeoutInput) || 1200;
-    centralToSelectionGap = currentMode === "testing" ? 0 : speed;
-    selectionToCentralGap = parseInt(selectionToCentralGapInput) || 1000;
+    // Get settings based on the mode
+    let speed, timeLimit, selectionTimeout, centralToSelectionGap, selectionToCentralGap;
+    
+    try {
+        if (currentMode === 'testing') {
+            speed = parseFloat(document.getElementById('speed-testing').value) || 1;
+            timeLimit = parseInt(document.getElementById('timeLimit-testing').value) || 60;
+            selectionTimeout = parseInt(document.getElementById('selectionTimeout-testing').value) || 1200;
+            centralToSelectionGap = 0; // Not used in testing mode
+            selectionToCentralGap = 0; // Not used in testing mode
+        } else {
+            speed = parseInt(document.getElementById('speed-training').value) || 500;
+            timeLimit = parseInt(document.getElementById('timeLimit-training').value) || 120;
+            selectionTimeout = parseInt(document.getElementById('selectionTimeout-training').value) || 1200;
+            centralToSelectionGap = speed; // In training mode, speed is the gap after central light
+            selectionToCentralGap = parseInt(document.getElementById('selectionToCentralGap-training').value) || 1000;
+        }
 
-    const screenSizeInput = document.getElementById("screenSize");
-    const viewingDistanceElement = document.getElementById("viewingDistance");
-    const screenSize = parseFloat(screenSizeInput.value);
-    const viewingDistanceText = viewingDistanceElement.textContent;
-    const viewingDistance = parseFloat(viewingDistanceText.replace(" cm", ""));
+        // Get screen settings
+        const screenSize = parseFloat(document.getElementById('screenSize').value) || 19;
+        const viewingDistanceText = document.getElementById('viewingDistance').textContent;
+        const viewingDistance = parseFloat(viewingDistanceText.replace(/[^0-9.]/g, '')) || (screenSize * 1.5 * 2.54);
+        const deviceType = document.getElementById('deviceType').value;
+        const resolutionWidth = parseInt(document.getElementById('resolutionWidth').value) || 1920;
+        const resolutionHeight = parseInt(document.getElementById('resolutionHeight').value) || 1080;
 
-    if (isNaN(screenSize) || screenSize <= 0 || isNaN(viewingDistance) || viewingDistance <= 0) {
-        console.error("Invalid screen size or viewing distance.");
-        return;
+        // Validate essential inputs
+        if (!screenSize || !viewingDistance || !resolutionWidth || !resolutionHeight) {
+            alert('Please fill in all required fields (screen size, resolution, etc.)');
+            return;
+        }
+
+        // Construct the URL with all parameters
+        const params = new URLSearchParams({
+            mode: currentMode,
+            speed: speed,
+            time_limit: timeLimit,
+            selection_timeout: selectionTimeout,
+            central_to_selection_gap: centralToSelectionGap,
+            selection_to_central_gap: selectionToCentralGap,
+            screen_size: screenSize,
+            viewing_distance: viewingDistance,
+            device_type: deviceType,
+            resolution_width: resolutionWidth,
+            resolution_height: resolutionHeight
+        });
+
+        // Navigate to the training page
+        window.location.href = `/training/?${params.toString()}`;
+
+    } catch (error) {
+        console.error('Error starting session:', error);
+        alert('There was an error starting the session. Please check all inputs and try again.');
     }
-
-    // Redirect to Training Page
-    window.location.href = `/training/?mode=${currentMode}&speed=${speed}&time_limit=${timeLimit}&selection_timeout=${selectionTimeout}&central_to_selection_gap=${centralToSelectionGap}&selection_to_central_gap=${selectionToCentralGap}&screen_size=${screenSize}&viewing_distance=${viewingDistance}&device_type=${document.getElementById("deviceType").value}`;
 }
 
 // Add Event Listeners on Page Load

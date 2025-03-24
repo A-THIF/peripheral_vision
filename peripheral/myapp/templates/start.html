@@ -12,8 +12,7 @@
     <!-- Page 1: Start Page -->
     <div id="page1" class="container">
         <div class="header">Peripheral Vision Training</div>
-        <button class="btn choice" onclick="enterFullscreen()">Start Training in Fullscreen</button>
-        <button class="btn choice" onclick="showPage2()">Start Training</button>
+        <button class="btn choice" onclick="enterFullscreenAndContinue()">Start Training</button>
     </div>
 
     <!-- Page 2: Mode Selection -->
@@ -86,10 +85,25 @@
             <option value="laptop">Laptop</option>
         </select>
         <p class="default-note">Select your device type to calculate the optimal viewing distance.</p>
+        
         <label>Screen Size (Diagonal in Inches):</label>
         <input type="number" id="screenSize" step="1" value="19">
         <p class="default-note">Enter your screen's diagonal size (e.g., 27 for a 27-inch monitor, 15 for a 15-inch laptop).</p>
-        <p class="text-center mt-3"><strong>Recommended Viewing Distance:</strong> <span id="viewingDistance">Please enter your screen details to calculate.</span></p>
+
+        <label for="resolutionWidth">Screen Resolution Width (px):</label>
+        <input type="number" id="resolutionWidth" placeholder="e.g., 1920" step="1">
+        <label for="resolutionHeight">Screen Resolution Height (px):</label>
+        <input type="number" id="resolutionHeight" placeholder="e.g., 1080" step="1">
+        <p class="default-note">Enter your screen's resolution (e.g., 1920x1080)</p>
+
+        <p class="text-center mt-3">
+            <strong>Recommended Viewing Distance:</strong> 
+            <span id="viewingDistance">Please enter your screen details to calculate.</span>
+        </p>
+        <p class="text-center">
+            <strong>Horizontal Field of View:</strong> 
+            <span id="hFov">--</span>°
+        </p>
     </div>
     <div class="button-group">
         <button class="btn choice" onclick="window.open('/onspot-distance-detection/', '_blank')">On-Spot Distance Detection</button>

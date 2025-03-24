@@ -9,6 +9,8 @@ const selectionToCentralGap = parseInt(urlParams.get('selection_to_central_gap')
 const screenSize = parseFloat(urlParams.get('screen_size')) || 19;
 const viewingDistance = parseFloat(urlParams.get('viewing_distance')) || (screenSize * 1.5 * 2.54);
 const deviceType = urlParams.get('device_type') || 'desktop';
+const resolutionWidth = parseInt(urlParams.get('resolution_width')) || 1920;
+const resolutionHeight = parseInt(urlParams.get('resolution_height')) || 1080;
 
 // Debug: Log URL parameters
 console.log("URL Parameters:", {
@@ -20,8 +22,11 @@ console.log("URL Parameters:", {
     selectionToCentralGap,
     screenSize,
     viewingDistance,
-    deviceType
+    deviceType,
+    resolutionWidth,
+    resolutionHeight
 });
+
 // Game state
 let timeRemaining = timeLimit;
 let score = 0;
@@ -33,6 +38,7 @@ let correctLight = null;
 let timerInterval = null;
 let gameTimeout = null;
 let testingInterval = null; // For Testing mode flashing
+let isSelectionEnabled = true; // Flag to prevent multiple selections
 
 // Colors for the lights
 const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00']; // Red, Green, Blue, Yellow
@@ -43,9 +49,6 @@ const topLeftLight = document.getElementById('topLeftLight');
 const topRightLight = document.getElementById('topRightLight');
 const bottomLeftLight = document.getElementById('bottomLeftLight');
 const bottomRightLight = document.getElementById('bottomRightLight');
-const timeRemainingDisplay = document.getElementById('timeRemaining');
-const scoreDisplay = document.getElementById('score');
-const totalAttemptsDisplay = document.getElementById('totalAttempts');
 const pauseModal = document.getElementById('pauseModal');
 const endModal = document.getElementById('endModal');
 const trainingPage = document.getElementById('trainingPage');
@@ -56,13 +59,6 @@ const reportWrong = document.getElementById('reportWrong');
 const reportScore = document.getElementById('reportScore');
 const reportTotal = document.getElementById('reportTotal');
 const reportAccuracy = document.getElementById('reportAccuracy');
-const header = document.querySelector('.header'); // To update the mode display
-
-// Speed display
-const speedDisplay = document.createElement('div');
-speedDisplay.className = 'speed';
-speedDisplay.innerHTML = `Speed: ${mode === 'training' ? speed + ' ms' : speed + 'X'}`;
-trainingPage.insertBefore(speedDisplay, document.querySelector('.timer'));
 
 const cornerLights = {
     topLeft: topLeftLight,
@@ -71,8 +67,19 @@ const cornerLights = {
     bottomRight: bottomRightLight
 };
 
-// Update header based on mode
-header.textContent = mode === 'training' ? 'Training Mode' : 'Testing Mode';
+// Add keydown event listener for the spacebar to toggle pause/resume
+document.addEventListener('keydown', (event) => {
+    if (event.code === 'Space' && timeRemaining > 0) {
+        event.preventDefault(); // Prevent default spacebar behavior (e.g., scrolling)
+        if (!isPaused) {
+            // If the game is not paused, pause it
+            pauseSessionWithStats();
+        } else {
+            // If the game is paused, resume it
+            resumeSession();
+        }
+    }
+});
 
 // Call adjustLights on page load and on window resize
 document.addEventListener('DOMContentLoaded', () => {
@@ -91,13 +98,13 @@ function adjustLights() {
         return;
     }
 
-    // Use device_type to set DPI (dots per inch)
+    // Use device_type to set DPI
     const dpi = deviceType === 'desktop' ? 96 : 120;
     const pixelsPerCm = dpi / 2.54;
 
     // Calculate visual angle sizes for the lights
-    const centralAngle = 2;
-    const cornerAngle = 1.5;
+    const centralAngle = 2; // Central light: 2 degrees
+    const cornerAngle = 1.5; // Corner lights: 1.5 degrees
 
     // Size calculations
     const centralSizeCm = 2 * viewingDistance * Math.tan((centralAngle / 2) * (Math.PI / 180));
@@ -111,20 +118,32 @@ function adjustLights() {
         light.style.setProperty('--corner-size', `${cornerSizePx}px`);
     });
 
-    // Calculate H-FOV
-    const diagonalMeters = screenSize * 2.54 / 100;
-    const aspectRatioFactor = 16 / Math.sqrt(16 * 16 + 9 * 9);
-    const screenWidthMeters = diagonalMeters * aspectRatioFactor;
-    const viewingDistanceMeters = viewingDistance / 100;
-    const hFovRad = 2 * Math.atan(screenWidthMeters / (2 * viewingDistanceMeters));
-    const hFovDeg = hFovRad * (180 / Math.PI);
+    // Calculate screen dimensions using actual aspect ratio
+    const diagonalMeters = screenSize * 0.0254; // Convert inches to meters
+    const aspectRatio = resolutionWidth / resolutionHeight;
+    const W = diagonalMeters / Math.sqrt(1 + (1 / aspectRatio) ** 2); // Screen width in meters
+    const H = W / aspectRatio; // Screen height in meters
 
-    console.log(`Calculated H-FOV: ${hFovDeg.toFixed(2)}° for screen size ${screenSize}" at viewing distance ${viewingDistance} cm`);
+    // Convert viewing distance to meters
+    const d = viewingDistance / 100; // Convert cm to meters
 
-    // Calculate edge distances
-    const distanceToEdgeMeters = viewingDistanceMeters * Math.tan((hFovDeg / 2) * (Math.PI / 180));
-    const distanceToEdgeCm = distanceToEdgeMeters * 100;
-    const distanceToEdgePx = distanceToEdgeCm * pixelsPerCm;
+    // Calculate H-FOV (θ)
+    const thetaRad = 2 * Math.atan(W / (2 * d)); // H-FOV in radians
+    const thetaDeg = thetaRad * (180 / Math.PI); // H-FOV in degrees
+
+    // Calculate V-FOV (φ)
+    const phiRad = 2 * Math.atan(H / (2 * d)); // V-FOV in radians
+    const phiDeg = phiRad * (180 / Math.PI); // V-FOV in degrees
+
+    // Calculate x and y distances for corner lights
+    const xMeters = d * Math.tan(thetaRad / 2); // Horizontal distance to edge of H-FOV
+    const yMeters = d * Math.tan(phiRad / 2); // Vertical distance to edge of V-FOV
+
+    // Convert x and y to pixels using the resolution
+    const pixelsPerMeterX = resolutionWidth / W; // Pixels per meter (horizontal)
+    const pixelsPerMeterY = resolutionHeight / H; // Pixels per meter (vertical)
+    const xPx = xMeters * pixelsPerMeterX; // Convert x to pixels
+    const yPx = yMeters * pixelsPerMeterY; // Convert y to pixels
 
     // Get viewport dimensions and center
     const viewportWidth = window.innerWidth;
@@ -132,25 +151,30 @@ function adjustLights() {
     const centerX = viewportWidth / 2;
     const centerY = viewportHeight / 2;
 
-    // Position calculations
+    // Position calculations with margins
     const margin = 20;
-    const edgeX = Math.min(distanceToEdgePx, (viewportWidth / 2) - margin - (cornerSizePx / 2));
-    const edgeY = Math.min((viewportHeight / 2) - margin - (cornerSizePx / 2), (viewportHeight / 2) - margin);
+    const topLeftX = Math.max(margin, centerX - xPx - (cornerSizePx / 2));
+    const topLeftY = Math.max(margin, centerY - yPx - (cornerSizePx / 2));
+    const topRightX = Math.min(viewportWidth - margin - cornerSizePx, centerX + xPx - (cornerSizePx / 2));
+    const topRightY = Math.max(margin, centerY - yPx - (cornerSizePx / 2));
+    const bottomLeftX = Math.max(margin, centerX - xPx - (cornerSizePx / 2));
+    const bottomLeftY = Math.min(viewportHeight - margin - cornerSizePx, centerY + yPx - (cornerSizePx / 2));
+    const bottomRightX = Math.min(viewportWidth - margin - cornerSizePx, centerX + xPx - (cornerSizePx / 2));
+    const bottomRightY = Math.min(viewportHeight - margin - cornerSizePx, centerY + yPx - (cornerSizePx / 2));
 
     // Apply positions to corner lights
-    topLeftLight.style.left = `${centerX - edgeX}px`;
-    topLeftLight.style.top = `${centerY - edgeY}px`;
-
-    topRightLight.style.right = `${centerX - edgeX}px`;
-    topRightLight.style.top = `${centerY - edgeY}px`;
-
-    bottomLeftLight.style.left = `${centerX - edgeX}px`;
-    bottomLeftLight.style.bottom = `${centerY - edgeY}px`;
-
-    bottomRightLight.style.right = `${centerX - edgeX}px`;
-    bottomRightLight.style.bottom = `${centerY - edgeY}px`;
+    topLeftLight.style.left = `${topLeftX}px`;
+    topLeftLight.style.top = `${topLeftY}px`;
+    topRightLight.style.right = `${viewportWidth - topRightX - cornerSizePx}px`;
+    topRightLight.style.top = `${topRightY}px`;
+    bottomLeftLight.style.left = `${bottomLeftX}px`;
+    bottomLeftLight.style.bottom = `${viewportHeight - bottomLeftY - cornerSizePx}px`;
+    bottomRightLight.style.right = `${viewportWidth - bottomRightX - cornerSizePx}px`;
+    bottomRightLight.style.bottom = `${viewportHeight - bottomRightY - cornerSizePx}px`;
 
     // Debug logging
+    console.log(`H-FOV: ${thetaDeg.toFixed(2)} degrees, V-FOV: ${phiDeg.toFixed(2)} degrees`);
+    console.log(`Corner light distances: x=${xPx.toFixed(2)}px, y=${yPx.toFixed(2)}px`);
     console.log("Corner light positions:", {
         topLeft: { left: topLeftLight.style.left, top: topLeftLight.style.top },
         topRight: { right: topRightLight.style.right, top: topRightLight.style.top },
@@ -159,46 +183,111 @@ function adjustLights() {
     });
 }
 
+// Function to request fullscreen mode with error handling
+function goFullscreen() {
+    const element = document.documentElement; // Target the entire document
+    const requestFullscreen = element.requestFullscreen || 
+                             element.webkitRequestFullscreen || 
+                             element.mozRequestFullScreen || 
+                             element.msRequestFullscreen;
+
+    if (requestFullscreen) {
+        requestFullscreen.call(element).then(() => {
+            console.log("Successfully entered fullscreen mode");
+        }).catch(err => {
+            console.error("Failed to enter fullscreen mode:", err);
+            // Fallback: Prompt user to click to start
+            showStartPrompt();
+        });
+    } else {
+        console.error("Fullscreen API is not supported in this browser");
+        // Fallback: Prompt user to click to start
+        showStartPrompt();
+    }
+}
+
+// Function to show a start prompt if fullscreen fails
+function showStartPrompt() {
+    const prompt = document.createElement('div');
+    prompt.className = 'start-prompt';
+    prompt.innerHTML = `
+        <div class="modal-content">
+            <div class="header">Welcome to Peripheral Vision Training</div>
+            <p>Click the button below to start the session in fullscreen mode.</p>
+            <button class="btn choice" onclick="startWithFullscreen()">Start</button>
+        </div>
+    `;
+    document.body.appendChild(prompt);
+}
+
+// Function to start the session with fullscreen after user interaction
+window.startWithFullscreen = function() {
+    // Remove the prompt
+    const prompt = document.querySelector('.start-prompt');
+    if (prompt) {
+        prompt.remove();
+    }
+
+    // Try to enter fullscreen again
+    const element = document.documentElement;
+    const requestFullscreen = element.requestFullscreen || 
+                             element.webkitRequestFullscreen || 
+                             element.mozRequestFullScreen || 
+                             element.msRequestFullscreen;
+
+    if (requestFullscreen) {
+        requestFullscreen.call(element).then(() => {
+            console.log("Successfully entered fullscreen mode after user interaction");
+            // Start the game loop
+            if (mode === 'training') {
+                gameLoop();
+            } else if (mode === 'testing') {
+                gameLoopTesting();
+            }
+        }).catch(err => {
+            console.error("Failed to enter fullscreen mode even after user interaction:", err);
+            // Start the game loop anyway
+            if (mode === 'training') {
+                gameLoop();
+            } else if (mode === 'testing') {
+                gameLoopTesting();
+            }
+        });
+    } else {
+        // Start the game loop anyway if fullscreen is not supported
+        if (mode === 'training') {
+            gameLoop();
+        } else if (mode === 'testing') {
+            gameLoopTesting();
+        }
+    }
+};
+
 // Start the session
 startSession();
 
 function startSession() {
-    // Initialize displays
-    updateTimeDisplay();
-    scoreDisplay.textContent = score;
-    totalAttemptsDisplay.textContent = totalAttempts;
-
     // Start the timer
     timerInterval = setInterval(() => {
         if (!isPaused) {
             timeRemaining--;
-            updateTimeDisplay();
             if (timeRemaining <= 0) {
                 endSession();
             }
         }
     }, 1000);
 
-    // Start the game loop based on mode
-    if (mode === 'training') {
-        gameLoop();
-    } else if (mode === 'testing') {
-        gameLoopTesting();
-    }
+    // Request fullscreen mode when the session starts
+    goFullscreen();
 
     // Placeholder for eye tracking (future implementation)
     console.log("Eye tracking placeholder: Monitoring eye movement...");
 }
 
-function updateTimeDisplay() {
-    const minutes = Math.floor(timeRemaining / 60);
-    const seconds = timeRemaining % 60;
-    timeRemainingDisplay.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-}
-
 function gameLoop() {
     if (isPaused || timeRemaining <= 0) return;
-
+    
+    isSelectionEnabled = true; // Enable selection at the start of each round
     // Step 1: Show the central light with a random color
     const centralColor = colors[Math.floor(Math.random() * colors.length)];
     centralLight.style.backgroundColor = centralColor;
@@ -242,7 +331,6 @@ function gameLoop() {
             if (!isPaused) {
                 totalAttempts++;
                 missed++;
-                totalAttemptsDisplay.textContent = totalAttempts;
                 resetLights();
                 setTimeout(gameLoop, selectionToCentralGap); // Gap After Selection
             }
@@ -252,7 +340,8 @@ function gameLoop() {
 
 function gameLoopTesting() {
     if (isPaused || timeRemaining <= 0) return;
-
+    
+    isSelectionEnabled = true; // Enable selection at the start of each round
     // In Testing mode, speed is in Hz (e.g., 1 Hz = 1 flash per second)
     const flashInterval = 1000 / speed; // Convert Hz to ms (e.g., 1 Hz = 1000 ms)
     const onTime = flashInterval / 2; // Half the time on, half off
@@ -298,7 +387,6 @@ function gameLoopTesting() {
         if (!isPaused) {
             totalAttempts++;
             missed++;
-            totalAttemptsDisplay.textContent = totalAttempts;
             clearInterval(testingInterval);
             resetLights();
             setTimeout(gameLoopTesting, 1000); // Short pause before next round
@@ -307,7 +395,11 @@ function gameLoopTesting() {
 }
 
 function selectLight(position) {
-    if (isPaused || timeRemaining <= 0) return;
+    // If selection is disabled or game is paused/ended, ignore the click
+    if (!isSelectionEnabled || isPaused || timeRemaining <= 0) return;
+
+    // Immediately disable further selections
+    isSelectionEnabled = false;
 
     // Clear any existing timeout or interval
     clearTimeout(gameTimeout);
@@ -322,38 +414,16 @@ function selectLight(position) {
     } else {
         wrong++;
     }
-    scoreDisplay.textContent = score;
-    totalAttemptsDisplay.textContent = totalAttempts;
 
-    // Provide visual feedback
-    const selectedLight = cornerLights[position];
-    const correctLightElement = cornerLights[correctLight];
+    // Reset lights immediately
+    resetLights();
 
-    // Flash the selected light
-    selectedLight.style.transition = 'none'; // Disable transition for immediate change
-    selectedLight.style.backgroundColor = isCorrect ? '#00ff00' : '#ff0000'; // Green for correct, red for incorrect
-
-    // If incorrect, also flash the correct light green
-    if (!isCorrect) {
-        correctLightElement.style.transition = 'none';
-        correctLightElement.style.backgroundColor = '#00ff00';
+    // Proceed to the next round after the selectionToCentralGap
+    if (mode === 'training') {
+        setTimeout(gameLoop, selectionToCentralGap);
+    } else if (mode === 'testing') {
+        setTimeout(gameLoopTesting, 1000); // Fixed 1000ms gap for Testing mode
     }
-
-    // Reset the colors after a short delay (e.g., 500 ms)
-    setTimeout(() => {
-        selectedLight.style.transition = 'background-color 0.3s ease';
-        if (!isCorrect) {
-            correctLightElement.style.transition = 'background-color 0.3s ease';
-        }
-        resetLights();
-
-        // Proceed to the next round
-        if (mode === 'training') {
-            setTimeout(gameLoop, selectionToCentralGap); // Gap After Selection
-        } else if (mode === 'testing') {
-            setTimeout(gameLoopTesting, 1000); // Short pause before next round
-        }
-    }, 500); // Duration of the feedback flash
 }
 
 function hideCornerLights() {
@@ -366,15 +436,62 @@ function hideCornerLights() {
 function resetLights() {
     centralLight.style.backgroundColor = '#ccc';
     hideCornerLights();
+    isSelectionEnabled = true; // Make sure selection is enabled when lights are reset
 }
 
-function pauseSession() {
+// Add fullscreen change event listener
+document.addEventListener('fullscreenchange', handleFullscreenChange);
+document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+function handleFullscreenChange() {
+    if (!document.fullscreenElement && 
+        !document.webkitFullscreenElement && 
+        !document.mozFullscreenElement && 
+        !document.msFullscreenElement) {
+        // Pause the game when exiting fullscreen
+        pauseSessionWithStats();
+    }
+}
+
+function pauseSessionWithStats() {
     isPaused = true;
     clearTimeout(gameTimeout);
     if (mode === 'testing') {
         clearInterval(testingInterval);
     }
+    
+    // Format the time remaining as mm:ss
+    const minutes = Math.floor(timeRemaining / 60);
+    const seconds = timeRemaining % 60;
+    const formattedTime = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}s`;
+
+    // Update the pause modal content to show stats with "Good job" message
+    const modalContent = document.querySelector('#pauseModal .modal-content');
+    modalContent.innerHTML = `
+        <div class="header">Paused</div>
+        <p>Good job! Press spacebar to resume.</p>
+        <div class="stats-container">
+            <p><strong>Mode:</strong> <span>${mode === 'training' ? 'Training Mode' : 'Testing Mode'}</span></p>
+            <p><strong>Speed:</strong> <span>${speed} ms</span></p>
+            <p><strong>Time Remaining:</strong> <span>${formattedTime}</span></p>
+            <p><strong>Score:</strong> <span>${score}/${totalAttempts}</span></p>
+            <p><strong>Correct:</strong> <span>${score}</span></p>
+            <p><strong>Missed:</strong> <span>${missed}</span></p>
+            <p><strong>Wrong:</strong> <span>${wrong}</span></p>
+        </div>
+        <div class="button-group">
+            <button class="btn choice" onclick="resumeSession()">Resume</button>
+            <button class="btn choice" onclick="showEndModal()">End</button>
+        </div>
+    `;
+    
     pauseModal.style.display = 'flex';
+}
+
+function pauseSession() {
+    pauseSessionWithStats();
 }
 
 function resumeSession() {
@@ -432,3 +549,43 @@ function restartSession() {
 function returnToStart() {
     window.location.href = '/';
 }
+
+// Add styles for the pause modal and start prompt
+const styles = `
+.stats-container {
+    background-color: #222;
+    padding: 15px;
+    border-radius: 5px;
+    margin: 10px 0;
+    text-align: left;
+}
+
+.stats-container p {
+    margin: 8px 0;
+    color: #ffffff;
+    font-size: 16px;
+}
+
+.stats-container strong {
+    color: #ffffff;
+    margin-right: 10px;
+}
+
+.start-prompt {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+`;
+
+// Add the styles to the document
+const styleSheet = document.createElement("style");
+styleSheet.innerText = styles;
+document.head.appendChild(styleSheet);
