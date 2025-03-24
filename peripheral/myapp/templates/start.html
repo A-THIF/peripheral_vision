@@ -58,9 +58,15 @@
         </div>
     </div>
 
+<<<<<<< Updated upstream
     <!-- Page 4: Dynamic Distance Calculation -->
     <div id="page4" class="container" style="display: none;">
         <button class="back-btn" onclick="showPage3(currentMode)">Back</button>
+=======
+    <!-- Page 5: Distance Detection -->
+    <div id="page5" class="container" style="display: none;">
+        <button class="back-btn" onclick="showPreviousPage()">Back</button>
+>>>>>>> Stashed changes
         <div class="header">Peripheral Vision Training</div>
         <div class="settings-group">
             <label>Device Type:</label>
@@ -69,6 +75,7 @@
                 <option value="laptop">Laptop</option>
             </select>
             <p class="default-note">Select your device type to calculate the optimal viewing distance.</p>
+<<<<<<< Updated upstream
             <label>Screen Size (Diagonal in Inches):</label>
             <input type="number" id="screenSize" min="10" max="50" step="1" value="27">
             <p class="default-note">Enter your screen's diagonal size (e.g., 27 for a 27-inch monitor, 15 for a 15-inch laptop).</p>
@@ -81,6 +88,30 @@
         <canvas id="canvas" style="display: none;"></canvas>
         <div class="button-group">
             <button class="btn choice" onclick="startFaceTracking()">Enable Webcam for On-Spot Distance</button>
+=======
+            
+            <label>Screen Size (Diagonal in Inches):</label>
+            <input type="number" id="screenSize" step="1" value="19">
+            <p class="default-note">Enter your screen's diagonal size (e.g., 27 for a 27-inch monitor, 15 for a 15-inch laptop).</p>
+
+            <label for="resolutionWidth">Screen Resolution Width (px):</label>
+            <input type="number" id="resolutionWidth" placeholder="e.g., 1920" step="1">
+            <label for="resolutionHeight">Screen Resolution Height (px):</label>
+            <input type="number" id="resolutionHeight" placeholder="e.g., 1080" step="1">
+            <p class="default-note">Enter your screen's resolution (e.g., 1920x1080)</p>
+
+            <p class="text-center mt-3">
+                <strong>Recommended Viewing Distance:</strong> 
+                <span id="viewingDistance">Please enter your screen details to calculate.</span>
+            </p>
+            <p class="text-center">
+                <strong>Horizontal Field of View:</strong> 
+                <span id="hFov">--</span>°
+            </p>
+        </div>
+        <div class="button-group">
+            <button class="btn choice" onclick="window.open('/onspot-distance-detection/?required_distance=' + requiredDistance, '_blank')">On-Spot Distance Detection</button>
+>>>>>>> Stashed changes
             <button class="btn choice" onclick="startSession()">Start</button>
         </div>
     </div>

@@ -5,7 +5,11 @@ let currentMode = "testing";
 let selectionTimeout = 1200;
 let centralToSelectionGap = 500;
 let selectionToCentralGap = 1000;
+<<<<<<< Updated upstream
 let requiredDistance = 0;
+=======
+let requiredDistance = 0; // Store requiredDistance globally
+>>>>>>> Stashed changes
 
 // Page navigation functions
 function showPage1() {
@@ -24,11 +28,46 @@ function showPage2() {
         return;
     }
 
+<<<<<<< Updated upstream
     document.getElementById("page1").style.display = "none";
     document.getElementById("page2").style.display = "block";
     document.getElementById("page3").style.display = "none";
     document.getElementById("page4").style.display = "none";
     document.getElementById("mobileWarning").style.display = "none";
+=======
+    const deviceType = deviceTypeInput.value;
+    const screenSize = parseFloat(screenSizeInput.value);
+    const resolutionWidth = parseInt(resolutionWidthInput.value);
+    const resolutionHeight = parseInt(resolutionHeightInput.value);
+
+    if (isNaN(screenSize) || screenSize <= 0 || isNaN(resolutionWidth) || isNaN(resolutionHeight)) {
+        viewingDistance.textContent = "Please enter valid positive values.";
+        hFovDisplay.textContent = "--";
+        return;
+    }
+
+    // Base viewing distance (cm) based on device type
+    const baseDistance = deviceType === "desktop" ? 60 : 50; 
+    const referenceSize = deviceType === "desktop" ? 24 : 15;
+
+    // Proportional scaling for viewing distance
+    const adjustedDistance = (baseDistance / referenceSize) * screenSize;
+    requiredDistance = Math.round(adjustedDistance * 10) / 10; // Store globally
+    viewingDistance.textContent = `${requiredDistance} cm`;
+
+    // Calculate H-FOV
+    const screenWidthInCm = (screenSize * 2.54) * (resolutionWidth / Math.sqrt(resolutionWidth ** 2 + resolutionHeight ** 2));
+    const viewingDistanceMeters = requiredDistance / 100;
+    const screenWidthMeters = screenWidthInCm / 100;
+
+    const hFovRad = 2 * Math.atan((screenWidthMeters / 2) / viewingDistanceMeters);
+    const hFovDeg = (hFovRad * (180 / Math.PI)).toFixed(2);
+
+    // Update H-FOV Display
+    hFovDisplay.textContent = `${hFovDeg}`;
+
+    console.log(`Screen Size: ${screenSize} inches, Viewing Distance: ${requiredDistance} cm, H-FOV: ${hFovDeg}°`);
+>>>>>>> Stashed changes
 }
 
 function showPage3(mode) {
@@ -45,6 +84,7 @@ function showPage3(mode) {
     const timeLimitInput = document.getElementById("timeLimit");
     const timeLimitNote = document.getElementById("time-limit-note");
 
+<<<<<<< Updated upstream
     modeDisplay.textContent = `Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
 
     if (mode === "testing") {
@@ -69,6 +109,105 @@ function showPage3(mode) {
         timeLimitInput.min = 60;
         timeLimitInput.max = 300;
         timeLimitNote.textContent = "Recommended: 60-300 seconds";
+=======
+// Page Navigation Functions
+function showPage1() { showPage("page1"); }
+function showPage2() { showPage("page2"); }
+function showPage3(mode) { currentMode = mode; showPage("page3"); }
+function showPage4(mode) { currentMode = mode; showPage("page4"); }
+function showPage5() { 
+    showPage("page5");
+    updateViewingDistance(); // Ensure viewing distance is updated when showing Page 5
+}
+function showPage(id) {
+    const pages = ["page1", "page2", "page3", "page4", "page5", "mobileWarning"];
+    pages.forEach(page => {
+        document.getElementById(page).style.display = (page === id) ? "flex" : "none";
+    });
+}
+
+// Go Back to Previous Page
+function showPreviousPage() {
+    if (currentMode === "testing") showPage3("testing");
+    else showPage4("training");
+}
+
+// Start Training or Testing Session
+function startSession() {
+    // Get the current mode from the page visibility
+    const currentMode = document.getElementById('page3').style.display !== 'none' ? 'testing' : 'training';
+
+    // Get settings based on the mode
+    let speed, timeLimit, selectionTimeout, centralToSelectionGap, selectionToCentralGap;
+    
+    try {
+        if (currentMode === 'testing') {
+            speed = parseFloat(document.getElementById('speed-testing').value) || 1;
+            timeLimit = parseInt(document.getElementById('timeLimit-testing').value) || 60;
+            selectionTimeout = parseInt(document.getElementById('selectionTimeout-testing').value) || 1200;
+            centralToSelectionGap = 0; // Not used in testing mode
+            selectionToCentralGap = 0; // Not used in testing mode
+        } else {
+            speed = parseInt(document.getElementById('speed-training').value) || 500;
+            timeLimit = parseInt(document.getElementById('timeLimit-training').value) || 120;
+            selectionTimeout = parseInt(document.getElementById('selectionTimeout-training').value) || 1200;
+            centralToSelectionGap = speed; // In training mode, speed is the gap after central light
+            selectionToCentralGap = parseInt(document.getElementById('selectionToCentralGap-training').value) || 1000;
+        }
+
+        // Get screen settings
+        const screenSize = parseFloat(document.getElementById('screenSize').value) || 19;
+        const viewingDistanceText = document.getElementById('viewingDistance').textContent;
+        const viewingDistance = parseFloat(viewingDistanceText.replace(/[^0-9.]/g, '')) || (screenSize * 1.5 * 2.54);
+        const deviceType = document.getElementById('deviceType').value;
+        const resolutionWidth = parseInt(document.getElementById('resolutionWidth').value) || 1920;
+        const resolutionHeight = parseInt(document.getElementById('resolutionHeight').value) || 1080;
+
+        // Validate essential inputs
+        if (!screenSize || !viewingDistance || !resolutionWidth || !resolutionHeight) {
+            alert('Please fill in all required fields (screen size, resolution, etc.)');
+            return;
+        }
+
+        // Construct the URL with all parameters
+        const params = new URLSearchParams({
+            mode: currentMode,
+            speed: speed,
+            time_limit: timeLimit,
+            selection_timeout: selectionTimeout,
+            central_to_selection_gap: centralToSelectionGap,
+            selection_to_central_gap: selectionToCentralGap,
+            screen_size: screenSize,
+            viewing_distance: viewingDistance,
+            device_type: deviceType,
+            resolution_width: resolutionWidth,
+            resolution_height: resolutionHeight
+        });
+
+        // Navigate to the training page
+        window.location.href = `/training/?${params.toString()}`;
+
+    } catch (error) {
+        console.error('Error starting session:', error);
+        alert('There was an error starting the session. Please check all inputs and try again.');
+    }
+}
+
+// Add Event Listeners on Page Load
+function addEventListeners() {
+    const deviceTypeInput = document.getElementById("deviceType");
+    const screenSizeInput = document.getElementById("screenSize");
+    const resolutionWidthInput = document.getElementById("resolutionWidth");
+    const resolutionHeightInput = document.getElementById("resolutionHeight");
+
+    if (deviceTypeInput && screenSizeInput && resolutionWidthInput && resolutionHeightInput) {
+        deviceTypeInput.addEventListener("change", updateViewingDistance);
+        screenSizeInput.addEventListener("input", updateViewingDistance);
+        resolutionWidthInput.addEventListener("input", updateViewingDistance);
+        resolutionHeightInput.addEventListener("input", updateViewingDistance);
+    } else {
+        console.error("Device type, screen size, or resolution inputs not found.");
+>>>>>>> Stashed changes
     }
 }
 
@@ -82,6 +221,7 @@ function showPage4() {
     calculateViewingDistance();
 }
 
+<<<<<<< Updated upstream
 function enterFullscreen() {
     const element = document.documentElement;
     if (element.requestFullscreen) {
@@ -150,3 +290,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById("deviceType").addEventListener("change", calculateViewingDistance);
     document.getElementById("screenSize").addEventListener("input", calculateViewingDistance);
 });
+=======
+// Initialize on Page Load
+window.onload = function () {
+    checkDevice();
+    addEventListeners();
+};
+>>>>>>> Stashed changes
