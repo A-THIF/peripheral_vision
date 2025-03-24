@@ -1,64 +1,102 @@
-import cv2
-import numpy as np
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
-from django.shortcuts import render
-import base64
-import json
+from .models import SessionSettings, TrainingResult
+from django.contrib.auth.decorators import login_required  # Optional: If you implement user authentication
 
-# Load the Haar Cascade classifier for face detection
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+def start_page(request):
+    if request.method == 'POST':
+        # Collect data from the start page form
+        mode = request.POST.get('mode')
+        speed = float(request.POST.get('speed', 500 if mode == 'training' else 1))
+        time_limit = int(request.POST.get('time_limit', 120))
+        selection_timeout = int(request.POST.get('selection_timeout', 1200))
+        central_to_selection_gap = int(request.POST.get('central_to_selection_gap', 500))
+        selection_to_central_gap = int(request.POST.get('selection_to_central_gap', 1000))
+        screen_size = float(request.POST.get('screen_size', 19))
+        viewing_distance = float(request.POST.get('viewing_distance', screen_size * 1.5 * 2.54))
+        device_type = request.POST.get('device_type', 'desktop')
+        resolution_width = int(request.POST.get('resolution_width', 1920))
+        resolution_height = int(request.POST.get('resolution_height', 1080))
 
-# Constants for distance calculation
-REAL_FACE_WIDTH = 14  # Average face width in cm
-FOCAL_LENGTH = 670  # Needs calibration for your webcam (we'll calibrate later)
+        # Save the session settings to the database
+        session = SessionSettings.objects.create(
+            user=request.user if request.user.is_authenticated else None,  # Link to user if authenticated
+            mode=mode,
+            speed=speed,
+            time_limit=time_limit,
+            selection_timeout=selection_timeout,
+            central_to_selection_gap=central_to_selection_gap,
+            selection_to_central_gap=selection_to_central_gap,
+            screen_size=screen_size,
+            viewing_distance=viewing_distance,
+            device_type=device_type,
+            resolution_width=resolution_width,
+            resolution_height=resolution_height,
+        )
 
-def start(request):
-    return render(request, 'start.html')
+        # Redirect to the training page with session ID
+        params = {
+            'mode': mode,
+            'speed': speed,
+            'time_limit': time_limit,
+            'selection_timeout': selection_timeout,
+            'central_to_selection_gap': central_to_selection_gap,
+            'selection_to_central_gap': selection_to_central_gap,
+            'screen_size': screen_size,
+            'viewing_distance': viewing_distance,
+            'device_type': device_type,
+            'resolution_width': resolution_width,
+            'resolution_height': resolution_height,
+            'session_id': session.id,  # Pass session ID to link results
+        }
+        query_string = '&'.join([f"{key}={value}" for key, value in params.items()])
+        return redirect(f'/training/?{query_string}')
 
-def training(request):
-    return render(request, 'training.html')
+    return render(request, 'start.html')  # Replace with your start page template
 
-def onspot_distance_detection(request):
-    # Pass the required distance from the URL parameter to the template
-    required_distance = request.GET.get('required_distance', '0')
-    return render(request, 'onspot_distance_detection.html', {'required_distance': required_distance})
+def training_page(request):
+    # Pass the URL parameters to the template
+    return render(request, 'training.html', {
+        'mode': request.GET.get('mode', 'training'),
+        'speed': request.GET.get('speed', '500'),
+        'time_limit': request.GET.get('time_limit', '120'),
+        'selection_timeout': request.GET.get('selection_timeout', '1200'),
+        'central_to_selection_gap': request.GET.get('central_to_selection_gap', '500'),
+        'selection_to_central_gap': request.GET.get('selection_to_central_gap', '1000'),
+        'screen_size': request.GET.get('screen_size', '19'),
+        'viewing_distance': request.GET.get('viewing_distance', '19 * 1.5 * 2.54'),
+        'device_type': request.GET.get('device_type', 'desktop'),
+        'resolution_width': request.GET.get('resolution_width', '1920'),
+        'resolution_height': request.GET.get('resolution_height', '1080'),
+        'session_id': request.GET.get('session_id', ''),
+    })
 
-@csrf_exempt
-@require_POST
-def calculate_distance(request):
-    try:
-        # Parse the request body (expecting a JSON with a base64-encoded image)
-        data = json.loads(request.body)
-        image_data = data.get('image', '')
+def save_training_results(request):
+    if request.method == 'POST':
+        # Collect training results from the request
+        session_id = request.POST.get('session_id')
+        score = int(request.POST.get('score', 0))
+        total_attempts = int(request.POST.get('total_attempts', 0))
+        correct = int(request.POST.get('correct', 0))
+        missed = int(request.POST.get('missed', 0))
+        wrong = int(request.POST.get('wrong', 0))
+        accuracy = float(request.POST.get('accuracy', 0.0))
 
-        # Decode the base64 image
-        image_data = image_data.split(',')[1]  # Remove the "data:image/jpeg;base64," prefix
-        image_bytes = base64.b64decode(image_data)
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        # Retrieve the session
+        try:
+            session = SessionSettings.objects.get(id=session_id)
+        except SessionSettings.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Session not found'}, status=404)
 
-        # Convert to grayscale for face detection
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Detect faces
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-
-        if len(faces) > 0:
-            # Take the first detected face
-            (x, y, w, h) = faces[0]
-            face_width_pixels = w
-
-            # Calculate distance
-            if face_width_pixels > 0:
-                distance = (FOCAL_LENGTH * REAL_FACE_WIDTH) / face_width_pixels
-                distance = round(distance, 2)
-                return JsonResponse({'distance': distance, 'status': 'success'})
-            else:
-                return JsonResponse({'status': 'error', 'message': 'Invalid face width detected.'})
-        else:
-            return JsonResponse({'status': 'error', 'message': 'No face detected.'})
-
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)})
+        # Save the training results
+        TrainingResult.objects.create(
+            session=session,
+            score=score,
+            total_attempts=total_attempts,
+            correct=correct,
+            missed=missed,
+            wrong=wrong,
+            accuracy=accuracy,
+        )
+        return JsonResponse({'status': 'success'})
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)

@@ -1,36 +1,52 @@
 {% load static %}
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Peripheral Vision Training - Training Mode</title>
+    <title>Peripheral Vision Training - Session</title>
     <link rel="stylesheet" href="{% static 'css/training.css' %}">
+    <style>
+        #centralLight { --central-size: 50px; }
+        .corner-light { --corner-size: 30px; }
+    </style>
 </head>
 <body>
+    <!-- CSRF Token for AJAX -->
+    {% csrf_token %}
+
     <!-- Training Page -->
-    <div id="trainingPage" class="container">
-        <div class="light-container">
-            <!-- Central Light -->
-            <div id="centralLight" class="light central"></div>
-            <!-- Corner Lights -->
-            <div id="topLeftLight" class="light corner top-left" onclick="selectLight('topLeft')"></div>
-            <div id="topRightLight" class="light corner top-right" onclick="selectLight('topRight')"></div>
-            <div id="bottomLeftLight" class="light corner bottom-left" onclick="selectLight('bottomLeft')"></div>
-            <div id="bottomRightLight" class="light corner bottom-right" onclick="selectLight('bottomRight')"></div>
-        </div>
+    <div id="trainingPage" class="page">
+        <div id="centralLight" class="light central"></div>
+        <div id="topLeftLight" class="corner-light"></div>
+        <div id="topRightLight" class="corner-light"></div>
+        <div id="bottomLeftLight" class="corner-light"></div>
+        <div id="bottomRightLight" class="corner-light"></div>
     </div>
 
     <!-- Pause Modal -->
-    <div id="pauseModal" class="modal">
+    <div id="pauseModal" class="modal" style="display: none;">
         <div class="modal-content">
-            <!-- Content will be dynamically updated by JS -->
+            <div class="header">Paused</div>
+            <p>Use the arrow keys to navigate, Enter to select an option, or click the buttons below. Press Esc to pause again.</p>
+            <div class="stats-container">
+                <p><strong>Mode:</strong> <span id="pauseMode"></span></p>
+                <p><strong>Speed:</strong> <span id="pauseSpeed"></span></p>
+                <p><strong>Time Remaining:</strong> <span id="pauseTime"></span></p>
+                <p><strong>Score:</strong> <span id="pauseScore"></span></p>
+                <p><strong>Correct:</strong> <span id="pauseCorrect"></span></p>
+                <p><strong>Missed:</strong> <span id="pauseMissed"></span></p>
+                <p><strong>Wrong:</strong> <span id="pauseWrong"></span></p>
+            </div>
+            <div class="button-group">
+                <button class="btn choice" onclick="resumeSession()">Resume</button>
+                <button class="btn choice" onclick="showEndModal()">End</button>
+            </div>
         </div>
     </div>
 
     <!-- End Modal -->
-    <div id="endModal" class="modal">
+    <div id="endModal" class="modal" style="display: none;">
         <div class="modal-content">
             <div class="header">End Session</div>
             <p>Are you sure you want to end the session?</p>
@@ -42,15 +58,19 @@
     </div>
 
     <!-- Report Page -->
-    <div id="reportPage" class="container" style="display: none;">
-        <div class="header">Training Report</div>
-        <div class="settings-group">
-            <p><strong>Correct Selections:</strong> <span id="reportCorrect">0</span></p>
-            <p><strong>Total Attempts:</strong> <span id="reportTotal">0</span></p>
-            <p><strong>Accuracy:</strong> <span id="reportAccuracy">0</span>%</p>
+    <div id="reportPage" class="page" style="display: none;">
+        <div class="header">Session Report</div>
+        <div class="stats-container">
+            <p><strong>Correct:</strong> <span id="reportCorrect"></span></p>
+            <p><strong>Missed:</strong> <span id="reportMissed"></span></p>
+            <p><strong>Wrong:</strong> <span id="reportWrong"></span></p>
+            <p><strong>Score:</strong> <span id="reportScore"></span></p>
+            <p><strong>Total Attempts:</strong> <span id="reportTotal"></span></p>
+            <p><strong>Accuracy:</strong> <span id="reportAccuracy"></span>%</p>
         </div>
         <div class="button-group">
-            <button class="btn choice" onclick="returnToStart()">Back to Start</button>
+            <button class="btn choice" onclick="restartSession()">Restart</button>
+            <button class="btn choice" onclick="returnToStart()">Return to Start</button>
         </div>
     </div>
 

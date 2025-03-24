@@ -1,5 +1,4 @@
 {% load static %}
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,68 +8,72 @@
     <link rel="stylesheet" href="{% static 'css/start.css' %}">
 </head>
 <body>
-    <!-- Page 1: Start Page -->
-    <div id="page1" class="container">
+    {% csrf_token %}
+    <!-- Page 1: Device Settings -->
+    <div id="page1" class="page">
         <div class="header">Peripheral Vision Training</div>
-        <button class="btn choice" onclick="enterFullscreenAndContinue()">Start Training</button>
+        <div class="settings-group">
+            <label for="deviceType">Device Type:</label>
+            <select id="deviceType">
+                <option value="desktop">Desktop</option>
+                <option value="laptop">Laptop</option>
+            </select>
+            <label for="screenSize">Screen Size (inches):</label>
+            <input type="number" id="screenSize" value="19" oninput="updateViewingDistance()">
+            <p>Viewing Distance: <span id="viewingDistance"></span></p>
+            <label for="resolutionWidth">Resolution Width:</label>
+            <input type="number" id="resolutionWidth" value="1920">
+            <label for="resolutionHeight">Resolution Height:</label>
+            <input type="number" id="resolutionHeight" value="1080">
+        </div>
+        <div class="button-group">
+            <button class="btn choice" onclick="enterFullscreenAndContinue()">Next</button>
+        </div>
     </div>
 
     <!-- Page 2: Mode Selection -->
-    <div id="page2" class="container" style="display: none;">
-        <button class="back-btn" onclick="showPage1()">Back</button>
-        <div class="header">Peripheral Vision Training</div>
+    <div id="page2" class="page" style="display: none;">
+        <div class="header">Select Mode</div>
         <div class="button-group">
-            <button class="btn choice" onclick="showPage3('testing')">Testing</button>
-            <button class="btn choice" onclick="showPage4('training')">Training</button>
+            <button class="btn choice" onclick="currentMode = 'training'; updateSpeedLabel(); enterFullscreenAndContinue();">Training</button>
+            <button class="btn choice" onclick="currentMode = 'testing'; updateSpeedLabel(); enterFullscreenAndContinue();">Testing</button>
         </div>
     </div>
 
-    <!-- Page 3: Testing Mode Settings -->
-    <div id="page3" class="container" style="display: none;">
-        <button class="back-btn" onclick="showPage2()">Back</button>
-        <div class="header">Peripheral Vision Training</div>
+    <!-- Page 3: Speed and Timing Settings -->
+    <div id="page3" class="page" style="display: none;">
+        <div class="header">Settings</div>
         <div class="settings-group">
-            <span id="mode-display-testing">Mode: Testing</span>
-            <div id="speed-section-testing">
-                <label id="speed-label-testing">Blip Speed (Hz):</label>
-                <input type="number" id="speed-testing" min="0.5" max="2" step="0.1" value="1">
-                <p class="default-note" id="speed-note-testing">Recommended: 0.5-2 Hz</p>
-            </div>
-            <label id="time-limit-label-testing">Duration of the Testing (seconds):</label>
-            <input type="number" id="timeLimit-testing" min="30" max="180" step="10" value="60">
-            <p class="default-note" id="time-limit-note-testing">Recommended: 30-180 seconds</p>
-            <label>Selection Time (ms):</label>
-            <input type="number" id="selectionTimeout-testing" min="1000" max="2000" step="100" value="1200">
-            <p class="default-note">Recommended: 1000-2000 ms (Football: Start at 1200 ms, reduce to 1000 ms for speed)</p>
+            <label id="speedLabel" for="speed">Speed:</label>
+            <input type="number" id="speed" value="500" oninput="speed = parseInt(this.value) || (currentMode === 'training' ? 500 : 1)">
+            <label for="timeLimit">Time Limit (s):</label>
+            <input type="number" id="timeLimit" value="120" oninput="timeLimit = parseInt(this.value) || 120">
+            <label for="selectionTimeout">Selection Timeout (ms):</label>
+            <input type="number" id="selectionTimeout" value="1200" oninput="selectionTimeout = parseInt(this.value) || 1200">
+            <label for="centralToSelectionGap">Central to Selection Gap (ms):</label>
+            <input type="number" id="centralToSelectionGap" value="500" oninput="centralToSelectionGap = parseInt(this.value) || 500">
+            <label for="selectionToCentralGap">Selection to Central Gap (ms):</label>
+            <input type="number" id="selectionToCentralGap" value="1000" oninput="selectionToCentralGap = parseInt(this.value) || 1000">
         </div>
         <div class="button-group">
-            <button class="btn choice" onclick="showPage5()">Next: Calculate Viewing Distance</button>
+            <button class="btn choice" onclick="showPage(2)">Back</button>
+            <button class="btn choice" onclick="enterFullscreenAndContinue()">Next</button>
         </div>
     </div>
 
-    <!-- Page 4: Training Mode Settings -->
-    <div id="page4" class="container" style="display: none;">
-        <button class="back-btn" onclick="showPage2()">Back</button>
-        <div class="header">Peripheral Vision Training</div>
-        <div class="settings-group">
-            <span id="mode-display-training">Mode: Training</span>
-            <div id="speed-section-training">
-                <label id="speed-label-training">Gap After Central Light (ms):</label>
-                <input type="number" id="speed-training" min="300" max="1000" step="100" value="500">
-                <p class="default-note" id="speed-note-training">Recommended: 300-1000 ms (Football: Start at 500 ms, reduce to 300 ms for speed)</p>
-            </div>
-            <label id="time-limit-label-training">Duration of the Training (seconds):</label>
-            <input type="number" id="timeLimit-training" min="60" max="300" step="10" value="120">
-            <p class="default-note" id="time-limit-note-training">Recommended: 60-300 seconds</p>
-            <label>Selection Time (ms):</label>
-            <input type="number" id="selectionTimeout-training" min="1000" max="2000" step="100" value="1200">
-            <p class="default-note">Recommended: 1000-2000 ms (Football: Start at 1200 ms, reduce to 1000 ms for speed)</p>
-            <label>Gap After Selection (ms):</label>
-            <input type="number" id="selectionToCentralGap-training" min="500" max="1500" step="100" value="1000">
-            <p class="default-note">Recommended: 500-1500 ms (Football: Start at 1000 ms, reduce to 500 ms for speed)</p>
+    <!-- Page 4: Instructions -->
+    <div id="page4" class="page" style="display: none;">
+        <div class="header">Instructions</div>
+        <div class="settings-group text-center">
+            <p>Use the following keys to select the corner lights:</p>
+            <p><strong>Q:</strong> Top-Left, <strong>W:</strong> Top-Right, <strong>A:</strong> Bottom-Left, <strong>S:</strong> Bottom-Right</p>
+            <p>Alternatively, click on the corner lights with your mouse.</p>
+            <p>Use arrow keys to navigate between buttons and Enter to select, or click the buttons directly.</p>
+            <p>Press Esc to pause the session.</p>
         </div>
         <div class="button-group">
-            <button class="btn choice" onclick="showPage5()">Next: Calculate Viewing Distance</button>
+            <button class="btn choice" onclick="showPage(3)">Back</button>
+            <button class="btn choice" onclick="startSession()">Start</button>
         </div>
     </div>
 
