@@ -1,13 +1,13 @@
 /* General Styles */
 body {
-    margin: 0;
-    font-family: 'Montserrat', sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    background-color: #f5f5f5;
-  }
+  margin: 0;
+  font-family: 'Montserrat', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #000000; /* Changed to black */
+}s
   
   /* Container for Pages */
   .container {
@@ -45,48 +45,62 @@ body {
     max-height: 100%;
   }
   
-  /* Lights */
-  .light {
-    position: absolute;
-    border-radius: 50%;
-    transition: background-color 0.3s ease;
+ /* Lights */
+.light {
+  position: absolute;
+  border-radius: 50%;
+  transition: background-color 0.3s ease;
+}
+
+.central {
+  width: var(--central-size, 50px);
+  height: var(--central-size, 50px);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #ccc;
+}
+
+.corner {
+  width: var(--corner-size, 40px);
+  height: var(--corner-size, 40px);
+  background-color: #ccc;
+  cursor: pointer;
+}
+
+.top-left {
+  top: var(--corner-top, 10vh);
+  left: var(--corner-left, 10vw);
+}
+
+.top-right {
+  top: var(--corner-top, 10vh);
+  right: var(--corner-right, 10vw);
+}
+
+.bottom-left {
+  bottom: var(--corner-bottom, 10vh);
+  left: var(--corner-left, 10vw);
+}
+
+.bottom-right {
+  bottom: var(--corner-bottom, 10vh);
+  right: var(--corner-right, 10vw);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 600px) {
+  .btn, .choice {
+      font-size: 14px;
+      padding: 8px 16px;
   }
-  
-  .central {
-    width: 50px;
-    height: 50px;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: #ccc;
+  .header {
+      font-size: 20px;
   }
-  
-  .corner {
-    width: 40px;
-    height: 40px;
-    background-color: #ccc;
-    cursor: pointer;
+  .timer, .score {
+      font-size: 16px;
   }
-  
-  .top-left {
-    top: 10vh;
-    left: 10vw;
-  }
-  
-  .top-right {
-    top: 10vh;
-    right: 10vw;
-  }
-  
-  .bottom-left {
-    bottom: 10vh;
-    left: 10vw;
-  }
-  
-  .bottom-right {
-    bottom: 10vh;
-    right: 10vw;
-  }
+}
   
   /* Button Group */
   .button-group {

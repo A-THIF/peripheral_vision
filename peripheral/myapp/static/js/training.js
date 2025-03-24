@@ -1,11 +1,13 @@
 // Get URL parameters from start.js
 const urlParams = new URLSearchParams(window.location.search);
-const mode = urlParams.get('mode');
-const speed = parseInt(urlParams.get('speed')) || 500; // Should match centralToSelectionGap in Training mode
+const mode = urlParams.get('mode') || 'training'; // Default to training if not specified
+const speed = parseInt(urlParams.get('speed')) || (mode === 'training' ? 500 : 1); // ms for training, Hz for testing
 const timeLimit = parseInt(urlParams.get('time_limit')) || 120; // Duration (seconds)
 const selectionTimeout = parseInt(urlParams.get('selection_timeout')) || 1200; // Selection Time (ms)
 const centralToSelectionGap = parseInt(urlParams.get('central_to_selection_gap')) || 500; // Gap After Central Light (ms)
 const selectionToCentralGap = parseInt(urlParams.get('selection_to_central_gap')) || 1000; // Gap After Selection (ms)
+const screenSize = parseFloat(urlParams.get('screen_size')) || 19; // Screen size in inches (default to 19)
+const viewingDistance = parseFloat(urlParams.get('viewing_distance')) || 47.5; // Viewing distance in cm (default to 47.5)
 
 // Game state
 let timeRemaining = timeLimit;
@@ -14,7 +16,8 @@ let totalAttempts = 0;
 let isPaused = false;
 let correctLight = null;
 let timerInterval = null;
-let gameTimeout = null; // Use a single timeout instead of interval to control game loop
+let gameTimeout = null;
+let testingInterval = null; // For Testing mode flashing
 
 // Colors for the lights
 const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00']; // Red, Green, Blue, Yellow
@@ -35,6 +38,7 @@ const reportPage = document.getElementById('reportPage');
 const reportCorrect = document.getElementById('reportCorrect');
 const reportTotal = document.getElementById('reportTotal');
 const reportAccuracy = document.getElementById('reportAccuracy');
+const header = document.querySelector('.header'); // To update the mode display
 
 const cornerLights = {
     topLeft: topLeftLight,
@@ -43,11 +47,63 @@ const cornerLights = {
     bottomRight: bottomRightLight
 };
 
-// Validate mode
-if (mode !== 'training') {
-    alert('Invalid mode. Redirecting to start page.');
-    window.location.href = '/';
+// Update header based on mode
+header.textContent = mode === 'training' ? 'Training Mode' : 'Testing Mode';
+
+// Adjust light sizes and positions based on screen size and viewing distance
+function adjustLights() {
+    // Estimate DPI based on device type (assumption: desktops have lower DPI than laptops)
+    const deviceType = urlParams.get('mode') === 'testing' ? 'laptop' : 'desktop'; // Simplified assumption
+    const dpi = deviceType === 'desktop' ? 96 : 120; // Typical DPI values
+    const pixelsPerCm = dpi / 2.54; // Convert DPI to pixels per cm
+
+    // Calculate visual angle sizes
+    const centralAngle = 2; // Central light: 2 degrees
+    const cornerAngle = 1.5; // Corner lights: 1.5 degrees
+    const cornerPositionAngle = 30; // Corner lights: 30 degrees from center
+
+    // Size in cm = 2 * viewingDistance * tan(angle/2)
+    const centralSizeCm = 2 * viewingDistance * Math.tan((centralAngle / 2) * (Math.PI / 180));
+    const cornerSizeCm = 2 * viewingDistance * Math.tan((cornerAngle / 2) * (Math.PI / 180));
+    const cornerDistanceCm = 2 * viewingDistance * Math.tan((cornerPositionAngle / 2) * (Math.PI / 180));
+
+    // Convert sizes to pixels
+    const centralSizePx = centralSizeCm * pixelsPerCm;
+    const cornerSizePx = cornerSizeCm * pixelsPerCm;
+    const cornerDistancePx = cornerDistanceCm * pixelsPerCm;
+
+    // Apply sizes to the lights
+    centralLight.style.setProperty('--central-size', `${centralSizePx}px`);
+    Object.values(cornerLights).forEach(light => {
+        light.style.setProperty('--corner-size', `${cornerSizePx}px`);
+    });
+
+    // Calculate corner positions (convert distance to vw/vh for responsiveness)
+    const screenDiagonalCm = screenSize * 2.54; // Convert inches to cm
+    const screenDiagonalPx = screenDiagonalCm * pixelsPerCm; // Approximate diagonal in pixels
+    const cornerDistanceVw = (cornerDistancePx / screenDiagonalPx) * 100; // Convert to vw/vh percentage
+    const cornerOffset = 5; // Small offset from the edge (in vw/vh)
+
+    Object.values(cornerLights).forEach(light => {
+        light.style.setProperty('--corner-top', `${cornerOffset}vh`);
+        light.style.setProperty('--corner-bottom', `${cornerOffset}vh`);
+        light.style.setProperty('--corner-left', `${cornerOffset}vw`);
+        light.style.setProperty('--corner-right', `${cornerOffset}vw`);
+    });
+
+    // Adjust positions based on the calculated distance
+    topLeftLight.style.setProperty('--corner-top', `${cornerOffset}vh`);
+    topLeftLight.style.setProperty('--corner-left', `${cornerOffset}vw`);
+    topRightLight.style.setProperty('--corner-top', `${cornerOffset}vh`);
+    topRightLight.style.setProperty('--corner-right', `${cornerOffset}vw`);
+    bottomLeftLight.style.setProperty('--corner-bottom', `${cornerOffset}vh`);
+    bottomLeftLight.style.setProperty('--corner-left', `${cornerOffset}vw`);
+    bottomRightLight.style.setProperty('--corner-bottom', `${cornerOffset}vh`);
+    bottomRightLight.style.setProperty('--corner-right', `${cornerOffset}vw`);
 }
+
+// Call adjustLights on page load
+adjustLights();
 
 // Start the session
 startSession();
@@ -69,8 +125,12 @@ function startSession() {
         }
     }, 1000);
 
-    // Start the game loop
-    gameLoop();
+    // Start the game loop based on mode
+    if (mode === 'training') {
+        gameLoop();
+    } else if (mode === 'testing') {
+        gameLoopTesting();
+    }
 }
 
 function gameLoop() {
@@ -88,16 +148,26 @@ function gameLoop() {
         // Randomly select one corner light to match the central light
         const cornerKeys = Object.keys(cornerLights);
         correctLight = cornerKeys[Math.floor(Math.random() * cornerKeys.length)];
+
+        // Ensure all corner lights have distinct colors
+        const availableColors = [...colors];
+        const centralColorIndex = availableColors.indexOf(centralColor);
+        availableColors.splice(centralColorIndex, 1); // Remove the central color from available colors
+
+        // Assign the central color to the correct light
+        cornerLights[correctLight].style.backgroundColor = centralColor;
+
+        // Assign distinct colors to the other lights
+        const otherKeys = cornerKeys.filter(key => key !== correctLight);
+        otherKeys.forEach((key, index) => {
+            const colorIndex = index % availableColors.length;
+            cornerLights[key].style.backgroundColor = availableColors[colorIndex];
+            // Remove the used color to ensure distinctness
+            availableColors.splice(colorIndex, 1);
+        });
+
+        // Show all corner lights
         cornerKeys.forEach(key => {
-            if (key === correctLight) {
-                cornerLights[key].style.backgroundColor = centralColor;
-            } else {
-                let otherColor;
-                do {
-                    otherColor = colors[Math.floor(Math.random() * colors.length)];
-                } while (otherColor === centralColor);
-                cornerLights[key].style.backgroundColor = otherColor;
-            }
             cornerLights[key].style.display = 'block';
         });
 
@@ -116,21 +186,107 @@ function gameLoop() {
     }, centralToSelectionGap);
 }
 
+function gameLoopTesting() {
+    if (isPaused || timeRemaining <= 0) return;
+
+    // In Testing mode, speed is in Hz (e.g., 1 Hz = 1 flash per second)
+    const flashInterval = 1000 / speed; // Convert Hz to ms (e.g., 1 Hz = 1000 ms)
+    const onTime = flashInterval / 2; // Half the time on, half off
+    const offTime = flashInterval / 2;
+
+    // Select a random color for the central light
+    const centralColor = colors[Math.floor(Math.random() * colors.length)];
+    centralLight.style.backgroundColor = centralColor;
+
+    // Select the correct corner light to flash in sync
+    const cornerKeys = Object.keys(cornerLights);
+    correctLight = cornerKeys[Math.floor(Math.random() * cornerKeys.length)];
+
+    // Flash the central light and corner lights
+    let isOn = false;
+    testingInterval = setInterval(() => {
+        if (isPaused || timeRemaining <= 0) {
+            clearInterval(testingInterval);
+            resetLights();
+            return;
+        }
+
+        isOn = !isOn;
+        centralLight.style.backgroundColor = isOn ? centralColor : '#ccc';
+
+        // Flash the correct corner light in sync, others out of sync
+        cornerKeys.forEach(key => {
+            cornerLights[key].style.display = 'block';
+            if (key === correctLight) {
+                cornerLights[key].style.backgroundColor = isOn ? centralColor : '#ccc';
+            } else {
+                // Out of sync: flash opposite to the central light
+                cornerLights[key].style.backgroundColor = !isOn ? centralColor : '#ccc';
+            }
+        });
+    }, flashInterval / 2); // Toggle twice per cycle (on and off)
+
+    // Wait for selection or timeout
+    gameTimeout = setTimeout(() => {
+        if (isPaused || timeRemaining <= 0) return;
+
+        // If no selection was made, increment attempts and reset
+        if (!isPaused) {
+            totalAttempts++;
+            totalAttemptsDisplay.textContent = totalAttempts;
+            clearInterval(testingInterval);
+            resetLights();
+            setTimeout(gameLoopTesting, 1000); // Short pause before next round
+        }
+    }, selectionTimeout);
+}
+
 function selectLight(position) {
     if (isPaused || timeRemaining <= 0) return;
 
-    // Clear any existing timeout to prevent multiple loops
+    // Clear any existing timeout or interval
     clearTimeout(gameTimeout);
+    if (mode === 'testing') {
+        clearInterval(testingInterval);
+    }
 
     totalAttempts++;
-    if (position === correctLight) {
+    const isCorrect = position === correctLight;
+    if (isCorrect) {
         score++;
     }
     scoreDisplay.textContent = score;
     totalAttemptsDisplay.textContent = totalAttempts;
 
-    resetLights();
-    setTimeout(gameLoop, selectionToCentralGap); // Gap After Selection
+    // Provide visual feedback
+    const selectedLight = cornerLights[position];
+    const correctLightElement = cornerLights[correctLight];
+
+    // Flash the selected light
+    selectedLight.style.transition = 'none'; // Disable transition for immediate change
+    selectedLight.style.backgroundColor = isCorrect ? '#00ff00' : '#ff0000'; // Green for correct, red for incorrect
+
+    // If incorrect, also flash the correct light green
+    if (!isCorrect) {
+        correctLightElement.style.transition = 'none';
+        correctLightElement.style.backgroundColor = '#00ff00';
+    }
+
+    // Reset the colors after a short delay (e.g., 500 ms)
+    setTimeout(() => {
+        selectedLight.style.transition = 'background-color 0.3s ease';
+        if (!isCorrect) {
+            correctLightElement.style.transition = 'background-color 0.3s ease';
+        }
+        resetLights();
+
+        // Proceed to the next round
+        if (mode === 'training') {
+            setTimeout(gameLoop, selectionToCentralGap); // Gap After Selection
+        } else if (mode === 'testing') {
+            setTimeout(gameLoopTesting, 1000); // Short pause before next round
+        }
+    }, 500); // Duration of the feedback flash
 }
 
 function hideCornerLights() {
@@ -148,6 +304,9 @@ function resetLights() {
 function pauseSession() {
     isPaused = true;
     clearTimeout(gameTimeout);
+    if (mode === 'testing') {
+        clearInterval(testingInterval);
+    }
     pauseModal.style.display = 'flex';
 }
 
@@ -155,18 +314,28 @@ function resumeSession() {
     isPaused = false;
     pauseModal.style.display = 'none';
     endModal.style.display = 'none';
-    gameLoop();
+    if (mode === 'training') {
+        gameLoop();
+    } else if (mode === 'testing') {
+        gameLoopTesting();
+    }
 }
 
 function showEndModal() {
     isPaused = true;
     clearTimeout(gameTimeout);
+    if (mode === 'testing') {
+        clearInterval(testingInterval);
+    }
     endModal.style.display = 'flex';
 }
 
 function endSession() {
     clearInterval(timerInterval);
     clearTimeout(gameTimeout);
+    if (mode === 'testing') {
+        clearInterval(testingInterval);
+    }
     trainingPage.style.display = 'none';
     pauseModal.style.display = 'none';
     endModal.style.display = 'none';

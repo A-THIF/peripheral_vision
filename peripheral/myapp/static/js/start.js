@@ -159,15 +159,20 @@ function startSession() {
     centralToSelectionGap = currentMode === "testing" ? 0 : speed;
     selectionToCentralGap = currentMode === "testing" ? 0 : parseInt(selectionToCentralGapInput) || 1000;
 
-    let speedDisplay = speed;
-    if (currentMode === "testing") {
-        speedDisplay = speed + " Hz";
-    } else {
-        speedDisplay = speed + " ms";
-    }
+<<<<<<< Updated upstream
+    // Get screen size and viewing distance from page5
+    const screenSizeInput = document.getElementById("screenSize");
+    const viewingDistanceElement = document.getElementById("viewingDistance");
+    const screenSize = parseFloat(screenSizeInput.value);
+    const viewingDistanceText = viewingDistanceElement.textContent; // e.g., "47.5 cm"
+    const viewingDistance = parseFloat(viewingDistanceText.replace(" cm", ""));
 
-    alert(`Starting ${currentMode} with Speed: ${speedDisplay}, Duration: ${timeLimit}s, Selection Timeout: ${selectionTimeout}ms, Gaps: ${centralToSelectionGap}ms/${selectionToCentralGap}ms`);
-    window.location.href = `/training/?mode=${currentMode}&speed=${speed}&time_limit=${timeLimit}&selection_timeout=${selectionTimeout}¢ral_to_selection_gap=${centralToSelectionGap}&selection_to_central_gap=${selectionToCentralGap}`;
+    // Redirect to the training page with additional parameters
+    window.location.href = `/training/?mode=${currentMode}&speed=${speed}&time_limit=${timeLimit}&selection_timeout=${selectionTimeout}&central_to_selection_gap=${centralToSelectionGap}&selection_to_central_gap=${selectionToCentralGap}&screen_size=${screenSize}&viewing_distance=${viewingDistance}`;
+=======
+    // Redirect to the training page without showing an alert
+    window.location.href = `/training/?mode=${currentMode}&speed=${speed}&time_limit=${timeLimit}&selection_timeout=${selectionTimeout}&central_to_selection_gap=${centralToSelectionGap}&selection_to_central_gap=${selectionToCentralGap}`;
+>>>>>>> Stashed changes
 }
 
 // Check if the device is mobile
