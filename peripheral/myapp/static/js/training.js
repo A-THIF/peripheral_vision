@@ -1,19 +1,33 @@
 // Get URL parameters from start.js
 const urlParams = new URLSearchParams(window.location.search);
-const mode = urlParams.get('mode') || 'training'; // Default to training if not specified
-const speed = parseInt(urlParams.get('speed')) || (mode === 'training' ? 500 : 1); // ms for training, Hz for testing
-const timeLimit = parseInt(urlParams.get('time_limit')) || 120; // Duration (seconds)
-const selectionTimeout = parseInt(urlParams.get('selection_timeout')) || 1200; // Selection Time (ms)
-const centralToSelectionGap = parseInt(urlParams.get('central_to_selection_gap')) || 500; // Gap After Central Light (ms)
-const selectionToCentralGap = parseInt(urlParams.get('selection_to_central_gap')) || 1000; // Gap After Selection (ms)
-const screenSize = parseFloat(urlParams.get('screen_size')) || 19; // Screen size in inches (default to 19)
-const viewingDistance = parseFloat(urlParams.get('viewing_distance')) || 47.5; // Viewing distance in cm (default to 47.5)
-const deviceType = urlParams.get('device_type') || 'desktop'; // Device type (desktop or laptop, default to desktop)
+const mode = urlParams.get('mode') || 'training';
+const speed = parseInt(urlParams.get('speed')) || (mode === 'training' ? 500 : 1);
+const timeLimit = parseInt(urlParams.get('time_limit')) || 120;
+const selectionTimeout = parseInt(urlParams.get('selection_timeout')) || 1200;
+const centralToSelectionGap = parseInt(urlParams.get('central_to_selection_gap')) || 500;
+const selectionToCentralGap = parseInt(urlParams.get('selection_to_central_gap')) || 1000;
+const screenSize = parseFloat(urlParams.get('screen_size')) || 19;
+const viewingDistance = parseFloat(urlParams.get('viewing_distance')) || (screenSize * 1.5 * 2.54);
+const deviceType = urlParams.get('device_type') || 'desktop';
 
+// Debug: Log URL parameters
+console.log("URL Parameters:", {
+    mode,
+    speed,
+    timeLimit,
+    selectionTimeout,
+    centralToSelectionGap,
+    selectionToCentralGap,
+    screenSize,
+    viewingDistance,
+    deviceType
+});
 // Game state
 let timeRemaining = timeLimit;
 let score = 0;
 let totalAttempts = 0;
+let missed = 0; // Track missed attempts (timeout)
+let wrong = 0; // Track wrong selections
 let isPaused = false;
 let correctLight = null;
 let timerInterval = null;
@@ -37,9 +51,18 @@ const endModal = document.getElementById('endModal');
 const trainingPage = document.getElementById('trainingPage');
 const reportPage = document.getElementById('reportPage');
 const reportCorrect = document.getElementById('reportCorrect');
+const reportMissed = document.getElementById('reportMissed');
+const reportWrong = document.getElementById('reportWrong');
+const reportScore = document.getElementById('reportScore');
 const reportTotal = document.getElementById('reportTotal');
 const reportAccuracy = document.getElementById('reportAccuracy');
 const header = document.querySelector('.header'); // To update the mode display
+
+// Speed display
+const speedDisplay = document.createElement('div');
+speedDisplay.className = 'speed';
+speedDisplay.innerHTML = `Speed: ${mode === 'training' ? speed + ' ms' : speed + 'X'}`;
+trainingPage.insertBefore(speedDisplay, document.querySelector('.timer'));
 
 const cornerLights = {
     topLeft: topLeftLight,
@@ -51,26 +74,36 @@ const cornerLights = {
 // Update header based on mode
 header.textContent = mode === 'training' ? 'Training Mode' : 'Testing Mode';
 
-// Adjust light sizes and positions based on screen size, viewing distance, and device type
+// Call adjustLights on page load and on window resize
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM fully loaded, calling adjustLights");
+    adjustLights();
+});
+window.addEventListener('resize', () => {
+    console.log("Window resized, calling adjustLights");
+    adjustLights();
+});
+
 function adjustLights() {
+    // Validate inputs
+    if (isNaN(screenSize) || screenSize <= 0 || isNaN(viewingDistance) || viewingDistance <= 0) {
+        console.error("Invalid screen size or viewing distance:", { screenSize, viewingDistance });
+        return;
+    }
+
     // Use device_type to set DPI (dots per inch)
-    const dpi = deviceType === 'desktop' ? 96 : 120; // Typical DPI values: 96 for desktops, 120 for laptops
-    const pixelsPerCm = dpi / 2.54; // Convert DPI to pixels per cm
+    const dpi = deviceType === 'desktop' ? 96 : 120;
+    const pixelsPerCm = dpi / 2.54;
 
-    // Calculate visual angle sizes
-    const centralAngle = 2; // Central light: 2 degrees
-    const cornerAngle = 1.5; // Corner lights: 1.5 degrees
-    const cornerPositionAngle = 30; // Corner lights: 30 degrees from center
+    // Calculate visual angle sizes for the lights
+    const centralAngle = 2;
+    const cornerAngle = 1.5;
 
-    // Size in cm = 2 * viewingDistance * tan(angle/2)
+    // Size calculations
     const centralSizeCm = 2 * viewingDistance * Math.tan((centralAngle / 2) * (Math.PI / 180));
     const cornerSizeCm = 2 * viewingDistance * Math.tan((cornerAngle / 2) * (Math.PI / 180));
-    const cornerDistanceCm = viewingDistance * Math.tan(cornerPositionAngle * (Math.PI / 180)); // Distance from center to corner light
-
-    // Convert sizes to pixels
     const centralSizePx = centralSizeCm * pixelsPerCm;
     const cornerSizePx = cornerSizeCm * pixelsPerCm;
-    const cornerDistancePx = cornerDistanceCm * pixelsPerCm;
 
     // Apply sizes to the lights
     centralLight.style.setProperty('--central-size', `${centralSizePx}px`);
@@ -78,44 +111,60 @@ function adjustLights() {
         light.style.setProperty('--corner-size', `${cornerSizePx}px`);
     });
 
-    // Estimate the screen's physical dimensions in pixels
-    const screenDiagonalCm = screenSize * 2.54; // Convert inches to cm
-    const screenDiagonalPx = screenDiagonalCm * pixelsPerCm; // Approximate diagonal in pixels
+    // Calculate H-FOV
+    const diagonalMeters = screenSize * 2.54 / 100;
+    const aspectRatioFactor = 16 / Math.sqrt(16 * 16 + 9 * 9);
+    const screenWidthMeters = diagonalMeters * aspectRatioFactor;
+    const viewingDistanceMeters = viewingDistance / 100;
+    const hFovRad = 2 * Math.atan(screenWidthMeters / (2 * viewingDistanceMeters));
+    const hFovDeg = hFovRad * (180 / Math.PI);
 
-    // Assume a typical aspect ratio (16:9) to estimate width and height
-    const aspectRatio = 16 / 9;
-    const screenWidthPx = screenDiagonalPx / Math.sqrt(1 + (1 / aspectRatio) ** 2);
-    const screenHeightPx = screenWidthPx / aspectRatio;
+    console.log(`Calculated H-FOV: ${hFovDeg.toFixed(2)}° for screen size ${screenSize}" at viewing distance ${viewingDistance} cm`);
 
-    // Convert corner distance to vw and vh
-    const cornerDistanceVw = (cornerDistancePx / screenWidthPx) * 100; // Convert to vw percentage
-    const cornerDistanceVh = (cornerDistancePx / screenHeightPx) * 100; // Convert to vh percentage
+    // Calculate edge distances
+    const distanceToEdgeMeters = viewingDistanceMeters * Math.tan((hFovDeg / 2) * (Math.PI / 180));
+    const distanceToEdgeCm = distanceToEdgeMeters * 100;
+    const distanceToEdgePx = distanceToEdgeCm * pixelsPerCm;
 
-    // Calculate the offset from the center (50vw, 50vh) to place the corner lights at 30 degrees
-    // Since 30 degrees is roughly at a 45-degree angle in the 2D plane (for simplicity), adjust for top-left, top-right, etc.
-    const cornerOffsetVw = 50 - cornerDistanceVw; // Distance from the edge (left or right)
-    const cornerOffsetVh = 50 - cornerDistanceVh; // Distance from the edge (top or bottom)
+    // Get viewport dimensions and center
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const centerX = viewportWidth / 2;
+    const centerY = viewportHeight / 2;
 
-    // Apply positions to the corner lights
-    topLeftLight.style.setProperty('--corner-top', `${cornerOffsetVh}vh`);
-    topLeftLight.style.setProperty('--corner-left', `${cornerOffsetVw}vw`);
-    topRightLight.style.setProperty('--corner-top', `${cornerOffsetVh}vh`);
-    topRightLight.style.setProperty('--corner-right', `${cornerOffsetVw}vw`);
-    bottomLeftLight.style.setProperty('--corner-bottom', `${cornerOffsetVh}vh`);
-    bottomLeftLight.style.setProperty('--corner-left', `${cornerOffsetVw}vw`);
-    bottomRightLight.style.setProperty('--corner-bottom', `${cornerOffsetVh}vh`);
-    bottomRightLight.style.setProperty('--corner-right', `${cornerOffsetVw}vw`);
+    // Position calculations
+    const margin = 20;
+    const edgeX = Math.min(distanceToEdgePx, (viewportWidth / 2) - margin - (cornerSizePx / 2));
+    const edgeY = Math.min((viewportHeight / 2) - margin - (cornerSizePx / 2), (viewportHeight / 2) - margin);
+
+    // Apply positions to corner lights
+    topLeftLight.style.left = `${centerX - edgeX}px`;
+    topLeftLight.style.top = `${centerY - edgeY}px`;
+
+    topRightLight.style.right = `${centerX - edgeX}px`;
+    topRightLight.style.top = `${centerY - edgeY}px`;
+
+    bottomLeftLight.style.left = `${centerX - edgeX}px`;
+    bottomLeftLight.style.bottom = `${centerY - edgeY}px`;
+
+    bottomRightLight.style.right = `${centerX - edgeX}px`;
+    bottomRightLight.style.bottom = `${centerY - edgeY}px`;
+
+    // Debug logging
+    console.log("Corner light positions:", {
+        topLeft: { left: topLeftLight.style.left, top: topLeftLight.style.top },
+        topRight: { right: topRightLight.style.right, top: topRightLight.style.top },
+        bottomLeft: { left: bottomLeftLight.style.left, bottom: bottomLeftLight.style.bottom },
+        bottomRight: { right: bottomRightLight.style.right, bottom: bottomRightLight.style.bottom }
+    });
 }
-
-// Call adjustLights on page load
-adjustLights();
 
 // Start the session
 startSession();
 
 function startSession() {
     // Initialize displays
-    timeRemainingDisplay.textContent = timeRemaining;
+    updateTimeDisplay();
     scoreDisplay.textContent = score;
     totalAttemptsDisplay.textContent = totalAttempts;
 
@@ -123,7 +172,7 @@ function startSession() {
     timerInterval = setInterval(() => {
         if (!isPaused) {
             timeRemaining--;
-            timeRemainingDisplay.textContent = timeRemaining;
+            updateTimeDisplay();
             if (timeRemaining <= 0) {
                 endSession();
             }
@@ -136,6 +185,15 @@ function startSession() {
     } else if (mode === 'testing') {
         gameLoopTesting();
     }
+
+    // Placeholder for eye tracking (future implementation)
+    console.log("Eye tracking placeholder: Monitoring eye movement...");
+}
+
+function updateTimeDisplay() {
+    const minutes = Math.floor(timeRemaining / 60);
+    const seconds = timeRemaining % 60;
+    timeRemainingDisplay.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
 
 function gameLoop() {
@@ -180,9 +238,10 @@ function gameLoop() {
         gameTimeout = setTimeout(() => {
             if (isPaused || timeRemaining <= 0) return;
 
-            // If no selection was made, increment attempts and reset
+            // If no selection was made, increment attempts and missed
             if (!isPaused) {
                 totalAttempts++;
+                missed++;
                 totalAttemptsDisplay.textContent = totalAttempts;
                 resetLights();
                 setTimeout(gameLoop, selectionToCentralGap); // Gap After Selection
@@ -235,9 +294,10 @@ function gameLoopTesting() {
     gameTimeout = setTimeout(() => {
         if (isPaused || timeRemaining <= 0) return;
 
-        // If no selection was made, increment attempts and reset
+        // If no selection was made, increment attempts and missed
         if (!isPaused) {
             totalAttempts++;
+            missed++;
             totalAttemptsDisplay.textContent = totalAttempts;
             clearInterval(testingInterval);
             resetLights();
@@ -259,6 +319,8 @@ function selectLight(position) {
     const isCorrect = position === correctLight;
     if (isCorrect) {
         score++;
+    } else {
+        wrong++;
     }
     scoreDisplay.textContent = score;
     totalAttemptsDisplay.textContent = totalAttempts;
@@ -348,6 +410,9 @@ function endSession() {
 
     // Display report
     reportCorrect.textContent = score;
+    reportMissed.textContent = missed;
+    reportWrong.textContent = wrong;
+    reportScore.textContent = score;
     reportTotal.textContent = totalAttempts;
     reportAccuracy.textContent = totalAttempts > 0 ? Math.round((score / totalAttempts) * 100) : 0;
 }
@@ -356,6 +421,8 @@ function restartSession() {
     timeRemaining = timeLimit;
     score = 0;
     totalAttempts = 0;
+    missed = 0;
+    wrong = 0;
     isPaused = false;
     trainingPage.style.display = 'flex';
     reportPage.style.display = 'none';
