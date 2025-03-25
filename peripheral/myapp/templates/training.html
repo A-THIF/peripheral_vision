@@ -11,9 +11,6 @@
 <body>
     <!-- Training Page -->
     <div id="trainingPage" class="container">
-        <div class="header">Training Mode</div>
-        <div class="timer">Time Remaining: <span id="timeRemaining">120</span>s</div>
-        <div class="score">Score: <span id="score">0</span>/<span id="totalAttempts">0</span></div>
         <div class="light-container">
             <!-- Central Light -->
             <div id="centralLight" class="light central"></div>
@@ -23,21 +20,12 @@
             <div id="bottomLeftLight" class="light corner bottom-left" onclick="selectLight('bottomLeft')"></div>
             <div id="bottomRightLight" class="light corner bottom-right" onclick="selectLight('bottomRight')"></div>
         </div>
-        <div class="button-group">
-            <button class="btn" onclick="pauseSession()">Pause</button>
-            <button class="btn" onclick="showEndModal()">End</button>
-        </div>
     </div>
 
     <!-- Pause Modal -->
     <div id="pauseModal" class="modal">
         <div class="modal-content">
-            <div class="header">Paused</div>
-            <p>Session is paused. Resume to continue training.</p>
-            <div class="button-group">
-                <button class="btn choice" onclick="resumeSession()">Resume</button>
-                <button class="btn choice" onclick="showEndModal()">End</button>
-            </div>
+            <!-- Content will be dynamically updated by JS -->
         </div>
     </div>
 
@@ -62,7 +50,6 @@
             <p><strong>Accuracy:</strong> <span id="reportAccuracy">0</span>%</p>
         </div>
         <div class="button-group">
-            <button class="btn choice" onclick="restartSession()">Restart</button>
             <button class="btn choice" onclick="returnToStart()">Back to Start</button>
         </div>
     </div>

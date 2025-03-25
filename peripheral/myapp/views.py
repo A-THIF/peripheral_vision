@@ -20,25 +20,6 @@ def start(request):
 def training(request):
     return render(request, 'training.html')
 
-<<<<<<< Updated upstream
-def report_page(request):
-    # Fetch the latest result for simplicity (improve with user sessions later)
-    latest_result = VisionTestResult.objects.last()
-    return render(request, 'report.html', {'result': latest_result})
-
-def save_result(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        result = VisionTestResult(
-            speed_mode=data['speed_mode'],
-            field_left=data['field_left'],
-            field_right=data['field_right'],
-            missed_count=data['missed_count']
-        )
-        result.save()
-        return JsonResponse({'status': 'success', 'id': result.id})
-    return JsonResponse({'status': 'error'})
-=======
 def onspot_distance_detection(request):
     # Pass the required distance from the URL parameter to the template
     required_distance = request.GET.get('required_distance', '0')
@@ -81,4 +62,3 @@ def calculate_distance(request):
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)})
->>>>>>> Stashed changes
